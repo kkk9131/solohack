@@ -15,7 +15,7 @@ import { config as loadEnv } from 'dotenv';
 import { TaskManager } from '../core/taskManager.js';
 import { PomodoroTimer } from '../core/timer.js';
 import { ChatClient } from '../core/chat.js';
-import { loadTasks, saveTasks } from '../core/storage.js';
+import { loadTasks, saveTasks, saveTimer, loadTimer } from '../core/storage.js';
 
 loadEnv();
 
@@ -100,10 +100,37 @@ timerCmd
   .argument('[minutes]', 'Duration in minutes', (value) => Number.parseInt(value, 10), 25)
   .description('Start a pomodoro timer.')
   .action((minutes: number) => {
-    // 日本語メモ: タイマーの実時間連携は今後実装。ここでは状態リセットのイメージを掴む。
-    const localTimer = new PomodoroTimer(minutes);
-    localTimer.start();
+    // 日本語メモ: 実時間は永続化により算出。開始時刻と秒数を保存する。
+    const durationSeconds = minutes * 60;
+    void saveTimer({ startedAt: Date.now(), durationSeconds });
     console.log(`Started a ${minutes}-minute pomodoro.`);
+  });
+
+timerCmd
+  .command('status')
+  .description('Show remaining time if a timer is running.')
+  .action(async () => {
+    const t = await loadTimer();
+    if (!t) {
+      console.log('No timer running.');
+      return;
+    }
+    const now = Date.now();
+    const elapsed = Math.max(0, Math.floor((now - t.startedAt) / 1000));
+    const remaining = Math.max(0, t.durationSeconds - elapsed);
+    const mm = Math.floor(remaining / 60)
+      .toString()
+      .padStart(2, '0');
+    const ss = (remaining % 60).toString().padStart(2, '0');
+    console.log(remaining > 0 ? `Remaining: ${mm}:${ss}` : 'Timer finished.');
+  });
+
+timerCmd
+  .command('stop')
+  .description('Stop and clear the current timer if any.')
+  .action(async () => {
+    await saveTimer(undefined);
+    console.log('Timer cleared.');
   });
 
 program
