@@ -2,9 +2,13 @@
 import { motion } from 'framer-motion';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import useTypewriter from '@/lib/useTypewriter';
 
 export default function Home() {
   const router = useRouter();
+  // タイトルとプロンプトのタイプライター
+  const { text: titleText, start: startTitle } = useTypewriter({ delayMs: 35 });
+  const { text: promptText, start: startPrompt } = useTypewriter({ delayMs: 20 });
 
   // 日本語メモ: Enter キーでダッシュボードへ遷移。
   useEffect(() => {
@@ -14,6 +18,18 @@ export default function Home() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [router]);
+
+  // 初回マウント時にタイプライター開始
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await startTitle('SOLO\nHACK');
+      if (!cancelled) await startPrompt('Press Enter to continue');
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [startTitle, startPrompt]);
 
   return (
     <main className="grid place-items-center min-h-dvh p-6 md:p-10">
@@ -36,9 +52,7 @@ export default function Home() {
               transition={{ duration: 0.6 }}
               className="font-pixel pixel-title text-neon text-[56px] md:text-[76px] leading-none tracking-[0.25em]"
             >
-              SOLO
-              <br />
-              HACK
+              <span className="whitespace-pre-line">{titleText || ' '}</span>
             </motion.h1>
             <motion.div
               initial={{ opacity: 0 }}
@@ -46,7 +60,7 @@ export default function Home() {
               transition={{ delay: 0.6 }}
               className="text-neon text-opacity-70 text-sm"
             >
-              Press Enter to continue
+              {promptText}
             </motion.div>
             <div className="pt-2">
               <button
