@@ -13,6 +13,9 @@ npm run dev
 - 開発: http://localhost:3000
 - 環境変数（SSEで応答を受けるには少なくともどちらかを設定）
   - `SOLOHACK_GEMINI_API_KEY=` または `GOOGLE_API_KEY=`
+  - タイプライター速度（クライアント側）
+    - `NEXT_PUBLIC_SOLOHACK_STREAM_DELAY_MS=60`（フォールバック時）
+    - `NEXT_PUBLIC_SOLOHACK_TITLE_DELAY_MS=60`（タイトル画面。未設定時は上記を流用）
 - ルート:
   - `/` タイトル（Enter またはボタンで `/dashboard`）
   - `/dashboard` HUD（Avatar/Timer/Progress + Chat ドロワー）

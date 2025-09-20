@@ -14,7 +14,8 @@ export default function ChatPanel({
   onStreamingChange?: (streaming: boolean) => void;
 }) {
   // 日本語メモ: SSEが使えない場合のフォールバックとしてタイプライターを保持。
-  const { text: fallbackText, start, cancel } = useTypewriter({ delayMs: 40 });
+  const fallbackDelay = Number(process.env.NEXT_PUBLIC_SOLOHACK_STREAM_DELAY_MS) || 60;
+  const { text: fallbackText, start, cancel } = useTypewriter({ delayMs: fallbackDelay });
   const [text, setText] = useState(''); // ストリーム中のAIテキスト
   const [input, setInput] = useState('');
   const [history, setHistory] = useState<{ role: 'user' | 'ai'; content: string }[]>([]);

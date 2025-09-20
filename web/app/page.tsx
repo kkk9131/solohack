@@ -6,9 +6,11 @@ import useTypewriter from '@/lib/useTypewriter';
 
 export default function Home() {
   const router = useRouter();
-  // タイトルとプロンプトのタイプライター
-  const { text: titleText, start: startTitle, cancel: cancelTitle } = useTypewriter({ delayMs: 35 });
-  const { text: promptText, start: startPrompt, cancel: cancelPrompt } = useTypewriter({ delayMs: 20 });
+  // タイトルとプロンプトのタイプライター（envで速度調整可能）
+  const envTitleDelay = Number(process.env.NEXT_PUBLIC_SOLOHACK_TITLE_DELAY_MS ?? process.env.NEXT_PUBLIC_SOLOHACK_STREAM_DELAY_MS);
+  const titleDelay = Number.isFinite(envTitleDelay) ? envTitleDelay : 60;
+  const { text: titleText, start: startTitle, cancel: cancelTitle } = useTypewriter({ delayMs: titleDelay });
+  const { text: promptText, start: startPrompt, cancel: cancelPrompt } = useTypewriter({ delayMs: titleDelay });
 
   // 日本語メモ: Enter キーでダッシュボードへ遷移。
   useEffect(() => {
