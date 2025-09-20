@@ -21,3 +21,4 @@
 - 2025-09-20 08時 CLI名をslhに揃えるため、help注記・docs置換・README開発者向け補足・npm run link を追加。
 - 2025-09-20 08時 タイマーのstatus/stopコマンドと永続化を実装。storageの統合API追加、テスト拡充・カバレッジ維持。
 - 2025-09-20 08時 タイマーresetコマンドを追加し、README/Docsを更新。
+- 2025-09-20 08時 タイマーにextend機能を追加し、status表示をプログレスバー+割合で視認性改善。Docs/README更新。

@@ -13,7 +13,6 @@
 import { Command } from 'commander';
 import { config as loadEnv } from 'dotenv';
 import { TaskManager } from '../core/taskManager.js';
-import { PomodoroTimer } from '../core/timer.js';
 import { ChatClient } from '../core/chat.js';
 import { loadTasks, saveTasks, saveTimer, loadTimer } from '../core/storage.js';
 
@@ -118,11 +117,24 @@ timerCmd
     const now = Date.now();
     const elapsed = Math.max(0, Math.floor((now - t.startedAt) / 1000));
     const remaining = Math.max(0, t.durationSeconds - elapsed);
-    const mm = Math.floor(remaining / 60)
-      .toString()
-      .padStart(2, '0');
-    const ss = (remaining % 60).toString().padStart(2, '0');
-    console.log(remaining > 0 ? `Remaining: ${mm}:${ss}` : 'Timer finished.');
+    const fmt = (sec: number) => {
+      const mm = Math.floor(sec / 60).toString().padStart(2, '0');
+      const ss = (sec % 60).toString().padStart(2, '0');
+      return `${mm}:${ss}`;
+    };
+
+    if (remaining <= 0) {
+      console.log('✅ Timer finished.');
+      return;
+    }
+
+    const barWidth = 20;
+    const ratio = Math.min(1, t.durationSeconds === 0 ? 1 : elapsed / t.durationSeconds);
+    const filled = Math.max(0, Math.min(barWidth, Math.round(barWidth * ratio)));
+    const empty = barWidth - filled;
+    const percent = Math.round(ratio * 100);
+    const bar = `${'█'.repeat(filled)}${'-'.repeat(empty)}`;
+    console.log(`⏳ Remaining: ${fmt(remaining)} | [${bar}] ${percent}%`);
   });
 
 timerCmd
@@ -144,6 +156,25 @@ timerCmd
     }
     await saveTimer({ startedAt: Date.now(), durationSeconds: t.durationSeconds });
     console.log('Timer reset.');
+  });
+
+timerCmd
+  .command('extend')
+  .argument('<minutes>', 'Additional minutes to extend', (v) => Number.parseInt(v, 10))
+  .description('Extend the running timer by the given minutes.')
+  .action(async (minutes: number) => {
+    if (!Number.isFinite(minutes) || minutes <= 0) {
+      console.log('Please provide a positive number of minutes.');
+      return;
+    }
+    const t = await loadTimer();
+    if (!t) {
+      console.log('No timer to extend.');
+      return;
+    }
+    const addSeconds = minutes * 60;
+    await saveTimer({ startedAt: t.startedAt, durationSeconds: t.durationSeconds + addSeconds });
+    console.log(`Extended by ${minutes} minute(s).`);
   });
 
 program
