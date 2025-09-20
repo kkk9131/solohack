@@ -38,3 +38,4 @@
 - 2025-09-20 パレットから.envへ設定保存（storage, chat mode/tone/stream/delay）。chatコマンドはENV既定を尊重。AGENTSにENV一覧を追記。
 - 2025-09-20 ロードマップにパレット/ENV永続化/ストレージ抽象化の達成を反映。
 - 2025-09-20 PRテンプレート/Issueテンプレート(不具合, 機能要望, Chore)を追加。
+- 2025-09-20 docs に Web 版要件定義書(Dreamflow風)を追加（docs/WEB_REQUIREMENTS.md）。CLI 版定義からリンクを追記。

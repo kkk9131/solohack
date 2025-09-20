@@ -29,9 +29,20 @@ SoloHack はソロ開発をゲーム感覚で継続できる体験を提供す�
 - [ ] プロジェクトボード運用とロードマップの定期更新フロー確立
 
 ## フェーズ2: Web 版 プロトタイプ
-- [ ] `src/core/` 共有の Web クライアント雛形（React/Next.js）
-- [ ] Supabase など外部永続層の PoC（認証・同期の検証）
-- [ ] UI コンポーネントとデザインシステムのドラフト
+- [x] Web 版 要件定義書の追加（docs/WEB_REQUIREMENTS.md）
+- [x] avatar-ui-core の調査と統合方針メモ（docs/integrations/avatar-ui-core.md）
+- [ ] Next.js(App Router) プロジェクト雛形の用意（Tailwind/Framer Motion 初期設定）
+- [ ] テーマトークン定義（黒/ネオン・グロー・HUD）とベースレイアウト
+- [ ] `Avatar` コンポーネント（idle/talk/celebrate、発光演出）
+- [ ] `useTypewriter`（SSEトークン追従・音声ON/OFF）
+- [ ] Chat サーバー（OpenAI SSE プロキシ）/ クライアント（右ドロワー）
+- [ ] タイマー（カウントダウン＋祝福演出とAvatar連動）
+- [ ] タスク CRUD（Supabase + RLS、HUD進捗）
+- [ ] 設定画面（AI名/口調、テーマ、ストリーム既定、遅延ms）
+- [ ] スモークE2E（タイトル→ダッシュボード→チャット/設定）
+- [ ] パフォーマンス/A11y 初期調整（LCP/CLS/フォーカス可視）
+
+参考: 仕様は docs/WEB_REQUIREMENTS.md、統合方針は docs/integrations/avatar-ui-core.md を参照。
 
 ## フェーズ3: マルチプラットフォーム展開
 - [ ] モバイル（React Native）/デスクトップ（Tauri/Electron）検討と試作
