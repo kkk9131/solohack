@@ -1,6 +1,6 @@
 "use client";
 import { motion, AnimatePresence } from 'framer-motion';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import useTypewriter from '@/lib/useTypewriter';
 import Avatar from '@/components/Avatar';
 
@@ -13,22 +13,49 @@ export default function ChatPanel({
   onClose: () => void;
   onStreamingChange?: (streaming: boolean) => void;
 }) {
-  // 日本語メモ: タイプライター + SSE ペーサ + 効果音（ENV制御）
-  const fallbackDelay = Number(process.env.NEXT_PUBLIC_SOLOHACK_STREAM_DELAY_MS) || 60;
-  const ssePace = Number(process.env.NEXT_PUBLIC_SOLOHACK_SSE_PACE_MS) || 0; // ms/char, 0=即時
-  const soundEnabled = String(process.env.NEXT_PUBLIC_SOLOHACK_SOUND_ENABLED).toLowerCase() === 'true';
-  const soundFreq = Number(process.env.NEXT_PUBLIC_SOLOHACK_SOUND_FREQ) || 1200;
-  const soundVolume = Number(process.env.NEXT_PUBLIC_SOLOHACK_SOUND_VOLUME) || 0.05;
-  const soundEndVolume = Number(process.env.NEXT_PUBLIC_SOLOHACK_SOUND_END_VOLUME) || 0.01;
-  const soundDuration = Number(process.env.NEXT_PUBLIC_SOLOHACK_SOUND_DURATION_MS) || 20;
-  const soundStep = Number(process.env.NEXT_PUBLIC_SOLOHACK_SOUND_STEP) || 2;
+  // 日本語メモ: タイプライター + SSE ペーサ + 効果音（ENVを初期値に、/commandで更新）
+  const envDefaults = useMemo(() => ({
+    fallbackDelay: Number(process.env.NEXT_PUBLIC_SOLOHACK_STREAM_DELAY_MS) || 60,
+    ssePace: Number(process.env.NEXT_PUBLIC_SOLOHACK_SSE_PACE_MS) || 0,
+    soundEnabled: String(process.env.NEXT_PUBLIC_SOLOHACK_SOUND_ENABLED).toLowerCase() === 'true',
+    soundFreq: Number(process.env.NEXT_PUBLIC_SOLOHACK_SOUND_FREQ) || 1200,
+    soundVolume: Number(process.env.NEXT_PUBLIC_SOLOHACK_SOUND_VOLUME) || 0.05,
+    soundEndVolume: Number(process.env.NEXT_PUBLIC_SOLOHACK_SOUND_END_VOLUME) || 0.01,
+    soundDuration: Number(process.env.NEXT_PUBLIC_SOLOHACK_SOUND_DURATION_MS) || 20,
+    soundStep: Number(process.env.NEXT_PUBLIC_SOLOHACK_SOUND_STEP) || 2,
+  }), []);
+
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
+    const s = localStorage.getItem('slh_sound_enabled');
+    return s == null ? envDefaults.soundEnabled : s === 'true';
+  });
+  const [ssePace, setSsePace] = useState<number>(() => {
+    const s = localStorage.getItem('slh_speed_ms');
+    return s == null ? envDefaults.ssePace : Number(s) || 0;
+  });
+  const [fallbackDelay, setFallbackDelay] = useState<number>(() => {
+    const s = localStorage.getItem('slh_fallback_delay_ms');
+    return s == null ? envDefaults.fallbackDelay : Number(s) || 60;
+  });
+  useEffect(() => { localStorage.setItem('slh_sound_enabled', String(soundEnabled)); }, [soundEnabled]);
+  useEffect(() => {
+    localStorage.setItem('slh_speed_ms', String(ssePace));
+    localStorage.setItem('slh_fallback_delay_ms', String(fallbackDelay));
+  }, [ssePace, fallbackDelay]);
+
+  const soundFreq = envDefaults.soundFreq;
+  const soundVolume = envDefaults.soundVolume;
+  const soundEndVolume = envDefaults.soundEndVolume;
+  const soundDuration = envDefaults.soundDuration;
+  const soundStep = envDefaults.soundStep;
+
   const { text: typeText, start, append, finalize, cancel } = useTypewriter({
     delayMs: fallbackDelay,
     paceMs: ssePace,
     sound: { enabled: soundEnabled, freq: soundFreq, volume: soundVolume, endVolume: soundEndVolume, durationMs: soundDuration, step: soundStep },
   });
   const [input, setInput] = useState('');
-  const [history, setHistory] = useState<{ role: 'user' | 'ai'; content: string }[]>([]);
+  const [history, setHistory] = useState<{ role: 'user' | 'ai' | 'system'; content: string }[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const [typingFallback, setTypingFallback] = useState(false);
   const [streaming, setStreaming] = useState(false);
@@ -47,12 +74,44 @@ export default function ChatPanel({
     };
   }, [open, cancel]);
 
+  function parseCommand(raw: string): string | null {
+    const parts = raw.trim().slice(1).split(/\s+/);
+    const cmd = (parts[0] || '').toLowerCase();
+    const arg = (parts[1] || '').toLowerCase();
+    const speeds: Record<string, number> = { instant: 0, fast: 40, normal: 60, slow: 100, slower: 140 };
+    switch (cmd) {
+      case 'help':
+      case 'h':
+        return 'Commands: /sound on|off, /speed <instant|fast|normal|slow|slower|ms>'; 
+      case 'sound': {
+        if (arg === 'on' || arg === 'off') {
+          setSoundEnabled(arg === 'on');
+          return `Sound: ${arg}`;
+        }
+        return 'Usage: /sound on|off';
+      }
+      case 'speed': {
+        let ms = speeds[arg];
+        if (ms == null) ms = Number(arg);
+        if (!Number.isFinite(ms) || ms < 0) return 'Usage: /speed <instant|fast|normal|slow|slower|ms>';
+        setSsePace(ms);
+        setFallbackDelay(Math.max(ms, 0));
+        return `Speed: ${ms} ms/char`;
+      }
+      default:
+        return `Unknown command: /${cmd}`;
+    }
+  }
+
   async function sendMessage(message: string) {
     if (!message.trim() || streaming) return;
+    if (message.trim().startsWith('/')) {
+      const res = parseCommand(message.trim());
+      if (res) setHistory((h) => [...h, { role: 'system', content: res }]);
+      return;
+    }
     // ユーザー発言を履歴追加
     setHistory((h) => [...h, { role: 'user', content: message }]);
-    // 表示領域をクリア
-    // （useTypewriterはappendで追加、fallbackはstartで一括）
     setStreaming(true);
     onStreamingChange?.(true);
     let useFallback = false;
