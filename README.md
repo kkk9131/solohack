@@ -62,6 +62,11 @@ The ultimate goal is to create a next-generation IDE that handles everything fro
 
 - Global link for local testing: `npm run link` (creates `slh` and `solohack` commands). If you had linked before, re-run to add the new alias.
 - Unlink (optional): `npm unlink -g solohack-cli` (and inside the repo: `npm unlink`)
+
+### Storage Provider
+- Select with env `SOLOHACK_STORAGE_PROVIDER`:
+  - `json` (default): persists at `storage/solohack.json`
+  - `memory`: in‑process only (useful for tests or ephemeral sessions)
 ## Shell Completion
 
 Generate completion script and enable it in your shell profile.

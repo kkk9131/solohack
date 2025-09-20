@@ -61,6 +61,11 @@ SoloHackプロジェクトは、このCLI版から始まり、将来的には以
 
 - ローカルでのリンク: `npm run link`（`slh` と `solohack` の両方が使えるようになります）。既にリンク済みの場合も、新エイリアス反映のため再実行してください。
 - 解除（任意）: `npm unlink -g solohack-cli`（必要に応じて、リポジトリ内で `npm unlink`）
+
+### ストレージプロバイダー
+- 環境変数 `SOLOHACK_STORAGE_PROVIDER` で選択できます。
+  - `json`（既定）: `storage/solohack.json` に保存
+  - `memory`: プロセス内のみの一時保存（テスト向き）
 ## シェル補完
 
 補完スクリプトを出力して、シェルの設定に取り込みます。
