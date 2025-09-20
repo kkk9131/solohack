@@ -22,6 +22,7 @@ export default function ChatPanel({
   const abortRef = useRef<AbortController | null>(null);
   const [typingFallback, setTypingFallback] = useState(false);
   const [streaming, setStreaming] = useState(false);
+  const ssePace = Number(process.env.NEXT_PUBLIC_SOLOHACK_SSE_PACE_MS) || 0; // ms/char, 0=即時
 
   useEffect(() => {
     if (!open) return;
@@ -53,6 +54,21 @@ export default function ChatPanel({
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buf = '';
+      // ペーサ: SSEトークンを文字単位で一定間隔表示
+      let runnerActive = false;
+      let queue = '';
+      const runPacer = async () => {
+        if (runnerActive) return; // 既に動作中
+        runnerActive = true;
+        while (queue.length) {
+          const ch = queue[0];
+          queue = queue.slice(1);
+          collected += ch;
+          setText(collected);
+          if (ssePace > 0) await new Promise((r) => setTimeout(r, ssePace));
+        }
+        runnerActive = false;
+      };
       for (;;) {
         const { value, done } = await reader.read();
         if (done) break;
@@ -70,11 +86,28 @@ export default function ChatPanel({
           try {
             const obj = JSON.parse(payload) as { token?: string };
             if (obj.token) {
-              collected += obj.token;
-              setText(collected);
+              if (ssePace > 0) {
+                queue += obj.token;
+                // 非同期に処理（awaitしない）
+                void runPacer();
+              } else {
+                collected += obj.token;
+                setText(collected);
+              }
             }
           } catch {}
         }
+      }
+      // 残りのキューをフラッシュ
+      if (ssePace > 0) {
+        // ランナーが止まるまで待機
+        await new Promise<void>((resolve) => {
+          const tick = () => {
+            if (runnerActive || queue.length) setTimeout(tick, 16);
+            else resolve();
+          };
+          tick();
+        });
       }
     } catch {
       useFallback = true;

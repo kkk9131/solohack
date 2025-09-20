@@ -16,6 +16,7 @@ npm run dev
   - タイプライター速度（クライアント側）
     - `NEXT_PUBLIC_SOLOHACK_STREAM_DELAY_MS=60`（フォールバック時）
     - `NEXT_PUBLIC_SOLOHACK_TITLE_DELAY_MS=60`（タイトル画面。未設定時は上記を流用）
+    - `NEXT_PUBLIC_SOLOHACK_SSE_PACE_MS=0`（SSEトークンの表示間隔ms。0=即時。例: 30〜60でゆっくり）
 - ルート:
   - `/` タイトル（Enter またはボタンで `/dashboard`）
   - `/dashboard` HUD（Avatar/Timer/Progress + Chat ドロワー）
