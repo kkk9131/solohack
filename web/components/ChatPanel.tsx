@@ -51,6 +51,7 @@ export default function ChatPanel({
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buf = '';
+      let collected = '';
       for (;;) {
         const { value, done } = await reader.read();
         if (done) break;
@@ -67,7 +68,10 @@ export default function ChatPanel({
           }
           try {
             const obj = JSON.parse(payload) as { token?: string };
-            if (obj.token) setText((t) => t + obj.token);
+            if (obj.token) {
+              collected += obj.token;
+              setText(collected);
+            }
           } catch {}
         }
       }
@@ -89,7 +93,7 @@ export default function ChatPanel({
           setHistory((h) => [...h, { role: 'ai', content: fallbackMessage }]);
         }
       } else {
-        setHistory((h) => [...h, { role: 'ai', content: text }]);
+        setHistory((h) => [...h, { role: 'ai', content: collected }]);
       }
       setText('');
     }
