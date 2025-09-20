@@ -28,13 +28,13 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
 
-      - name: Install dependencies (npm ci)
-        if: ${{ hashFiles('**/package-lock.json') != '' }}
-        run: npm ci
-
-      - name: Install dependencies (npm install)
-        if: ${{ hashFiles('**/package-lock.json') == '' }}
-        run: npm install
+      - name: Install dependencies (prefer ci, fallback to install)
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --no-audit --no-fund --legacy-peer-deps || npm install --no-audit --no-fund --legacy-peer-deps
+          else
+            npm install --no-audit --no-fund --legacy-peer-deps
+          fi
 
       - name: Lint
         run: npm run lint

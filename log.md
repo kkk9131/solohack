@@ -14,3 +14,4 @@
 - 2025-09-20 08時 カバレッジ閾値(85%)を設定し、storage/chat/timerのテストを追加。達成をロードマップに反映。
 - 2025-09-20 08時 ブランチ feat/cli-persistence-ci-docs を作成し、コミットとプッシュを実施。
 - 2025-09-20 08時 ESLint設定をメタパッケージ非依存( parser/plugin 直指定 )に変更し、CI互換性を向上。
+- 2025-09-20 08時 CIの依存インストールをnpm ci優先+legacy-peer-deps、失敗時npm installへフォールバックに変更（ESLint peer依存対策）。
