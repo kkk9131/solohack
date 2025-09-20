@@ -38,6 +38,7 @@ export default function ChatPanel({
     setStreaming(true);
     onStreamingChange?.(true);
     let useFallback = false;
+    let collected = '';
     try {
       const ac = new AbortController();
       abortRef.current = ac;
@@ -51,7 +52,6 @@ export default function ChatPanel({
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buf = '';
-      let collected = '';
       for (;;) {
         const { value, done } = await reader.read();
         if (done) break;
