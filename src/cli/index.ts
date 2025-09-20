@@ -23,9 +23,14 @@ const program = new Command();
 let tasks: TaskManager; // 日本語メモ: フックで永続化から読み込んで初期化する。
 
 program
-  .name('solohack')
+  .name('slh')
   .description('Gamified solo development CLI with AI partner.')
   .version('0.1.0');
+
+program.addHelpText(
+  'before',
+  '\nAlias: You can also run this CLI as "solohack".\n'
+);
 
 // 日本語メモ: Commander のサブコマンドはネストで定義すると誤解が少ない。
 const task = program.command('task').description('Task management');

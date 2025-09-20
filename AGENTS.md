@@ -14,6 +14,10 @@ After `npm install`, use:
 - `npm run lint` – runs eslint + prettier.
 Add new scripts to `package.json` instead of bespoke shell commands.
 
+Binary alias:
+- CLI binary is available as `solohack` and short alias `slh`.
+- If you previously ran `npm link`, re-run it to create the new alias.
+
 ## Coding Style & Naming Conventions
 Use TypeScript strict mode with 2-space indentation and trailing commas. Favor camelCase for functions and variables, PascalCase for classes, and kebab-case flags for CLI options. Export granular helpers from `src/core/` so the CLI layer stays thin. Run `npm run lint` before pushing; configure Prettier via `.prettierrc` when project files land.
 

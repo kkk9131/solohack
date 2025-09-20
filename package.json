@@ -6,7 +6,8 @@
   "type": "module",
   "main": "dist/cli/index.js",
   "bin": {
-    "solohack": "dist/cli/index.js"
+    "solohack": "dist/cli/index.js",
+    "slh": "dist/cli/index.js"
   },
   "scripts": {
     "build": "tsc --project tsconfig.json",
@@ -14,6 +15,7 @@
     "clean": "rimraf dist",
     "dev": "tsx src/cli/index.ts",
     "dev:watch": "tsx watch src/cli/index.ts",
+    "link": "npm link",
     "test": "vitest --run",
     "test:watch": "vitest",
     "test:ci": "vitest --run --coverage",

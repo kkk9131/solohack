@@ -22,22 +22,22 @@ CLI版は、その最初の学習MVPとして位置づけられます。
 
 #### タスク管理
 
-- `solohack task add "xxx"` → タスク追加
-- `solohack task list` → 一覧表示
-- `solohack task done <id>` → 完了
-- `solohack task remove <id>` → 削除
+- `slh task add "xxx"` → タスク追加
+- `slh task list` → 一覧表示
+- `slh task done <id>` → 完了
+- `slh task remove <id>` → 削除
 - 保存先：MVPはJSONファイル、拡張でSupabase
 
 #### タイマー
 
-- `solohack timer start 25` → 25分カウントダウン
-- `solohack timer status` → 残り時間確認
-- `solohack timer stop` → 停止
+- `slh timer start 25` → 25分カウントダウン
+- `slh timer status` → 残り時間確認
+- `slh timer stop` → 停止
 - 終了時に演出
 
 #### AIチャット（相棒）
 
-- `solohack chat "質問内容"` → OpenAI API呼び出し
+- `slh chat "質問内容"` → OpenAI API呼び出し
 - 出力はタイプライター風に1文字ずつ表示
 - モード切替：
   - `--mode tech`（技術相談／コード例重視）
