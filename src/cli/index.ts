@@ -223,7 +223,7 @@ program
       });
       const question = questionWords.join(' ');
       const useStream = options.noStream ? false : true;
-      const speedMap: Record<string, number> = { instant: 0, fast: 5, normal: 12, slow: 25 };
+      const speedMap: Record<string, number> = { instant: 0, fast: 5, normal: 12, slow: 40 };
       const envDelay = process.env.SOLOHACK_STREAM_DELAY_MS ? Number.parseInt(process.env.SOLOHACK_STREAM_DELAY_MS, 10) : undefined;
       const delay = Number.isFinite(options.delay)
         ? (options.delay as number)
