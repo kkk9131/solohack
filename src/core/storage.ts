@@ -2,7 +2,6 @@ import type { Task } from './taskManager.js';
 import type { RepoData, StorageProvider, TimerPersisted } from './storage/provider.js';
 import { JsonStorageProvider } from './storage/jsonProvider.js';
 
-// 日本語メモ: ストレージのルートデータ型。今後プロパティ追加して拡張する前提。
 export type { RepoData, TimerPersisted } from './storage/provider.js';
 
 // 日本語メモ: 今後の差し替え用プロバイダー取得（現状は JSON のみ）
