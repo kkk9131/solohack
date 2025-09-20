@@ -2,7 +2,6 @@ import js from '@eslint/js';
 import tsParser from '@typescript-eslint/parser';
 import tsPlugin from '@typescript-eslint/eslint-plugin';
 import prettier from 'eslint-config-prettier';
-import globals from 'globals';
 
 // 日本語メモ: Flat Config での最小構成。
 // typescript-eslint のメタパッケージは使わず、parser/plugin を直接設定する。
@@ -17,9 +16,14 @@ export default [
         project: './tsconfig.json',
         tsconfigRootDir: process.cwd()
       },
+      // 日本語メモ: 追加依存を避けるため最小限のグローバルのみ許可。
       globals: {
-        ...globals.node,
-        ...globals.es2021
+        console: 'readonly',
+        process: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly'
       }
     },
     plugins: {
