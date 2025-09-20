@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0b0f14;
+  --hud: #0e1620;
+  --neon: #00d8ff;
+  --glow: rgba(0, 216, 255, 0.6);
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  @apply bg-bg text-white font-mono antialiased;
+}
+
+.neon-text {
+  color: var(--neon);
+  text-shadow: 0 0 8px var(--glow), 0 0 16px var(--glow);
+}
+
+.hud-card {
+  @apply bg-hud/70 rounded-lg border border-neon/20 shadow-glow;
+}
+
