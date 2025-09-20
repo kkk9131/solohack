@@ -10,6 +10,8 @@ const ROOT = path.resolve(process.cwd());
 const SRC_DIR = path.join(ROOT, 'public', 'avatars', 'default', 'src');
 const OUT_DIR = path.join(ROOT, 'public', 'avatars', 'default');
 const SIZE = 128;
+const TRIM = true; // 透明背景の外周をトリミング
+const PADDING = 4; // 仕上がり128pxの内側に均等余白（px）
 
 async function ensureDir(p) {
   await fs.mkdir(p, { recursive: true });
@@ -33,13 +35,33 @@ async function main() {
   for (const f of files) {
     const srcPath = path.join(SRC_DIR, f);
     const outPath = path.join(OUT_DIR, outName(f));
-    console.log(`→ ${path.relative(ROOT, outPath)} (from ${f})`);
-    const img = sharp(srcPath, { limitInputPixels: false });
-    // 透明背景で中央に収め、最近傍でリサイズ。余白を保つため contain + extent。
-    await img
-      .resize(SIZE, SIZE, { fit: 'contain', kernel: sharp.kernel.nearest, background: { r: 0, g: 0, b: 0, alpha: 0 } })
-      .png({ compressionLevel: 9, palette: true })
-      .toFile(outPath);
+    try {
+      console.log(`→ ${path.relative(ROOT, outPath)} (from ${f})`);
+      let img = sharp(srcPath, { limitInputPixels: false });
+      if (TRIM) {
+        // 透明背景（左上ピクセル）を基準に外周をトリミング
+        img = img.trim();
+      }
+      // 最終128pxに対して、内側に均等余白を確保
+      const inner = Math.max(1, SIZE - PADDING * 2);
+      await img
+        .resize(inner, inner, {
+          fit: 'contain',
+          kernel: sharp.kernel.nearest,
+          background: { r: 0, g: 0, b: 0, alpha: 0 },
+        })
+        .extend({
+          top: PADDING,
+          bottom: PADDING,
+          left: PADDING,
+          right: PADDING,
+          background: { r: 0, g: 0, b: 0, alpha: 0 },
+        })
+        .png({ compressionLevel: 9, palette: true })
+        .toFile(outPath);
+    } catch (e) {
+      console.warn(`! Skip ${f}: ${e?.message ?? e}`);
+    }
   }
   console.log('Done.');
 }
@@ -48,4 +70,3 @@ main().catch((e) => {
   console.error(e);
   process.exit(1);
 });
-
