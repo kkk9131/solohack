@@ -18,3 +18,4 @@
 - 2025-09-20 08時 mainをリモート最新へ同期し、ローカルのfeatureブランチを削除。
 - 2025-09-20 08時 CLIバイナリの短縮エイリアスslhを追加し、README/AGENTSを更新。
 - 2025-09-20 08時 README(英/日)のコマンド例をslhに統一（残存のsolohack例を置換）。
+- 2025-09-20 08時 CLI名をslhに揃えるため、help注記・docs置換・README開発者向け補足・npm run link を追加。

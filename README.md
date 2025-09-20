@@ -50,3 +50,8 @@ The SoloHack project aims to expand from this CLI version to:
 3.  A full-fledged, **IDE-like Desktop Application**
 
 The ultimate goal is to create a next-generation IDE that handles everything from Git operations to building and deployment with a single click, all within a fun, game-like environment.
+
+## Developer Notes
+
+- Global link for local testing: `npm run link` (creates `slh` and `solohack` commands). If you had linked before, re-run to add the new alias.
+- Unlink (optional): `npm unlink -g solohack-cli` (and inside the repo: `npm unlink`)
