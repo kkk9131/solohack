@@ -19,6 +19,7 @@ export default function ChatPanel({
   const [input, setInput] = useState('');
   const [history, setHistory] = useState<{ role: 'user' | 'ai'; content: string }[]>([]);
   const abortRef = useRef<AbortController | null>(null);
+  const [typingFallback, setTypingFallback] = useState(false);
   const [streaming, setStreaming] = useState(false);
 
   useEffect(() => {
@@ -77,8 +78,16 @@ export default function ChatPanel({
       onStreamingChange?.(false);
       abortRef.current = null;
       if (useFallback) {
-        await start("Sorry, streaming is unavailable. Here's a fallback response.");
-        setHistory((h) => [...h, { role: 'ai', content: fallbackText }]);
+        const fallbackMessage = "Sorry, streaming is unavailable. Here's a fallback response.";
+        setTypingFallback(true);
+        onStreamingChange?.(true);
+        try {
+          await start(fallbackMessage);
+        } finally {
+          setTypingFallback(false);
+          onStreamingChange?.(false);
+          setHistory((h) => [...h, { role: 'ai', content: fallbackMessage }]);
+        }
       } else {
         setHistory((h) => [...h, { role: 'ai', content: text }]);
       }
@@ -114,16 +123,16 @@ export default function ChatPanel({
                   {m.content}
                 </div>
               ))}
-              {streaming && (
+              {(streaming || typingFallback) && (
                 <div>
                   <span className="text-neon text-opacity-70">AI&gt;</span>{' '}
-                  {text}
+                  {streaming ? text : fallbackText}
                   <span className="inline-block w-2 h-4 bg-neon bg-opacity-70 align-bottom animate-typeCursor ml-0.5" />
                 </div>
               )}
             </div>
             <div className="pt-1">
-              <Avatar state={streaming ? 'talk' : 'idle'} size={112} />
+              <Avatar state={(streaming || typingFallback) ? 'talk' : 'idle'} size={112} />
             </div>
           </div>
           {/* 入力欄 */}
