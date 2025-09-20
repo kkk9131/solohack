@@ -35,7 +35,7 @@ export default function ChatPanel({
           aria-modal="true"
         >
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-neon">AI Chat</h3>
+            <h3 className="font-pixel pixel-title text-neon text-base">AI Chat</h3>
             <button onClick={onClose} className="px-3 py-1 text-sm border border-neon border-opacity-40 rounded-md hover:bg-neon hover:bg-opacity-10">
               Close
             </button>

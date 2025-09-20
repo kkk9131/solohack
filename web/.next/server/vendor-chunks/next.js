@@ -373,6 +373,16 @@ eval("\nObject.defineProperty(exports, \"__esModule\", ({\n    value: true\n}));
 
 /***/ }),
 
+/***/ "(rsc)/./node_modules/next/font/google/target.css?{\"path\":\"app/layout.tsx\",\"import\":\"Press_Start_2P\",\"arguments\":[{\"subsets\":[\"latin\"],\"weight\":\"400\",\"display\":\"swap\",\"variable\":\"--font-pixel\"}],\"variableName\":\"pixel\"}":
+/*!***************************************************************************************************************************************************************************************************************************!*\
+  !*** ./node_modules/next/font/google/target.css?{"path":"app/layout.tsx","import":"Press_Start_2P","arguments":[{"subsets":["latin"],"weight":"400","display":"swap","variable":"--font-pixel"}],"variableName":"pixel"} ***!
+  \***************************************************************************************************************************************************************************************************************************/
+/***/ ((module) => {
+
+eval("// Exports\nmodule.exports = {\n\t\"style\": {\"fontFamily\":\"'__Press_Start_2P_6d0c14', '__Press_Start_2P_Fallback_6d0c14'\",\"fontWeight\":400,\"fontStyle\":\"normal\"},\n\t\"className\": \"__className_6d0c14\",\n\t\"variable\": \"__variable_6d0c14\"\n};\n//# sourceURL=[module]\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiKHJzYykvLi9ub2RlX21vZHVsZXMvbmV4dC9mb250L2dvb2dsZS90YXJnZXQuY3NzP3tcInBhdGhcIjpcImFwcC9sYXlvdXQudHN4XCIsXCJpbXBvcnRcIjpcIlByZXNzX1N0YXJ0XzJQXCIsXCJhcmd1bWVudHNcIjpbe1wic3Vic2V0c1wiOltcImxhdGluXCJdLFwid2VpZ2h0XCI6XCI0MDBcIixcImRpc3BsYXlcIjpcInN3YXBcIixcInZhcmlhYmxlXCI6XCItLWZvbnQtcGl4ZWxcIn1dLFwidmFyaWFibGVOYW1lXCI6XCJwaXhlbFwifSIsIm1hcHBpbmdzIjoiQUFBQTtBQUNBO0FBQ0EsV0FBVyxtSEFBbUg7QUFDOUg7QUFDQTtBQUNBIiwic291cmNlcyI6WyJ3ZWJwYWNrOi8vc29sb2hhY2std2ViLy4vbm9kZV9tb2R1bGVzL25leHQvZm9udC9nb29nbGUvdGFyZ2V0LmNzcz8wMjlhIl0sInNvdXJjZXNDb250ZW50IjpbIi8vIEV4cG9ydHNcbm1vZHVsZS5leHBvcnRzID0ge1xuXHRcInN0eWxlXCI6IHtcImZvbnRGYW1pbHlcIjpcIidfX1ByZXNzX1N0YXJ0XzJQXzZkMGMxNCcsICdfX1ByZXNzX1N0YXJ0XzJQX0ZhbGxiYWNrXzZkMGMxNCdcIixcImZvbnRXZWlnaHRcIjo0MDAsXCJmb250U3R5bGVcIjpcIm5vcm1hbFwifSxcblx0XCJjbGFzc05hbWVcIjogXCJfX2NsYXNzTmFtZV82ZDBjMTRcIixcblx0XCJ2YXJpYWJsZVwiOiBcIl9fdmFyaWFibGVfNmQwYzE0XCJcbn07XG4iXSwibmFtZXMiOltdLCJzb3VyY2VSb290IjoiIn0=\n//# sourceURL=webpack-internal:///(rsc)/./node_modules/next/font/google/target.css?{\"path\":\"app/layout.tsx\",\"import\":\"Press_Start_2P\",\"arguments\":[{\"subsets\":[\"latin\"],\"weight\":\"400\",\"display\":\"swap\",\"variable\":\"--font-pixel\"}],\"variableName\":\"pixel\"}\n");
+
+/***/ }),
+
 /***/ "(ssr)/./node_modules/next/dist/api/navigation.js":
 /*!**************************************************!*\
   !*** ./node_modules/next/dist/api/navigation.js ***!

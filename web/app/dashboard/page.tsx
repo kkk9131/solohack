@@ -13,7 +13,7 @@ export default function DashboardPage() {
   return (
     <main className="min-h-dvh p-6 md:p-10 space-y-8">
       <header className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold neon-text">Dashboard</h2>
+        <h2 className="font-pixel pixel-title text-neon text-2xl">Dashboard</h2>
         <button
           onClick={() => setChatOpen(true)}
           className="px-4 py-2 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10 transition"

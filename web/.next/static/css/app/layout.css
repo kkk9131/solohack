@@ -1,3 +1,55 @@
+/*!***********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[14].oneOf[2].use[1]!./node_modules/next/dist/build/webpack/loaders/next-font-loader/index.js??ruleSet[1].rules[14].oneOf[2].use[2]!./node_modules/next/font/google/target.css?{"path":"app/layout.tsx","import":"Press_Start_2P","arguments":[{"subsets":["latin"],"weight":"400","display":"swap","variable":"--font-pixel"}],"variableName":"pixel"} ***!
+  \***********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+/* cyrillic-ext */
+@font-face {
+  font-family: '__Press_Start_2P_6d0c14';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(/_next/static/media/dbbdd2d89d2ef0ef-s.woff2) format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: '__Press_Start_2P_6d0c14';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(/_next/static/media/a06229eb79a83cfc-s.woff2) format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* greek */
+@font-face {
+  font-family: '__Press_Start_2P_6d0c14';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(/_next/static/media/c9e224327ce7933e-s.woff2) format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+/* latin-ext */
+@font-face {
+  font-family: '__Press_Start_2P_6d0c14';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(/_next/static/media/d85064eaed4b8683-s.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: '__Press_Start_2P_6d0c14';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(/_next/static/media/db234bd00cda6a96-s.p.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}@font-face {font-family: '__Press_Start_2P_Fallback_6d0c14';src: local("Arial");ascent-override: 44.58%;descent-override: 0.00%;line-gap-override: 0.00%;size-adjust: 224.32%
+}.__className_6d0c14 {font-family: '__Press_Start_2P_6d0c14', '__Press_Start_2P_Fallback_6d0c14';font-weight: 400;font-style: normal
+}.__variable_6d0c14 {--font-pixel: '__Press_Start_2P_6d0c14', '__Press_Start_2P_Fallback_6d0c14'
+}
+
 /*!*************************************************************************************************************************************************************************************************************************************************************!*\
   !*** css ./node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[14].oneOf[12].use[2]!./node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[14].oneOf[12].use[3]!./app/globals.css ***!
   \*************************************************************************************************************************************************************************************************************************************************************/
@@ -536,11 +588,17 @@ video {
 .grid {
   display: grid;
 }
+.hidden {
+  display: none;
+}
 .h-2 {
   height: 0.5rem;
 }
 .h-4 {
   height: 1rem;
+}
+.h-3 {
+  height: 0.75rem;
 }
 .min-h-40 {
   min-height: 10rem;
@@ -554,11 +612,17 @@ video {
 .w-full {
   width: 100%;
 }
+.w-3 {
+  width: 0.75rem;
+}
 .max-w-md {
   max-width: 28rem;
 }
 .max-w-xl {
   max-width: 36rem;
+}
+.max-w-5xl {
+  max-width: 64rem;
 }
 @keyframes typeCursor {
 
@@ -576,11 +640,17 @@ video {
 .grid-cols-1 {
   grid-template-columns: repeat(1, minmax(0, 1fr));
 }
+.flex-col {
+  flex-direction: column;
+}
 .place-items-center {
   place-items: center;
 }
 .items-center {
   align-items: center;
+}
+.justify-center {
+  justify-content: center;
 }
 .justify-between {
   justify-content: space-between;
@@ -590,6 +660,9 @@ video {
 }
 .gap-6 {
   gap: 1.5rem;
+}
+.gap-2 {
+  gap: 0.5rem;
 }
 .space-y-2 > :not([hidden]) ~ :not([hidden]) {
   --tw-space-y-reverse: 0;
@@ -611,6 +684,9 @@ video {
   margin-top: calc(2rem * calc(1 - var(--tw-space-y-reverse)));
   margin-bottom: calc(2rem * var(--tw-space-y-reverse));
 }
+.overflow-hidden {
+  overflow: hidden;
+}
 .whitespace-pre-wrap {
   white-space: pre-wrap;
 }
@@ -620,26 +696,35 @@ video {
 .rounded-md {
   border-radius: 0.375rem;
 }
+.rounded-full {
+  border-radius: 9999px;
+}
 .border {
   border-width: 1px;
 }
 .border-l {
   border-left-width: 1px;
 }
+.border-b {
+  border-bottom-width: 1px;
+}
 .border-neon {
   border-color: var(--neon);
-}
-.border-opacity-40 {
-  --tw-border-opacity: 0.4;
-}
-.border-opacity-30 {
-  --tw-border-opacity: 0.3;
 }
 .border-opacity-20 {
   --tw-border-opacity: 0.2;
 }
+.border-opacity-30 {
+  --tw-border-opacity: 0.3;
+}
+.border-opacity-40 {
+  --tw-border-opacity: 0.4;
+}
 .bg-bg {
   background-color: var(--bg);
+}
+.bg-hud {
+  background-color: var(--hud);
 }
 .bg-neon {
   background-color: var(--neon);
@@ -647,8 +732,14 @@ video {
 .bg-white\/5 {
   background-color: rgb(255 255 255 / 0.05);
 }
-.bg-hud {
-  background-color: var(--hud);
+.bg-green-400\/80 {
+  background-color: rgb(74 222 128 / 0.8);
+}
+.bg-red-500\/80 {
+  background-color: rgb(239 68 68 / 0.8);
+}
+.bg-yellow-400\/80 {
+  background-color: rgb(250 204 21 / 0.8);
 }
 .bg-opacity-60 {
   --tw-bg-opacity: 0.6;
@@ -658,6 +749,12 @@ video {
 }
 .bg-opacity-95 {
   --tw-bg-opacity: 0.95;
+}
+.bg-opacity-20 {
+  --tw-bg-opacity: 0.2;
+}
+.bg-opacity-80 {
+  --tw-bg-opacity: 0.8;
 }
 .bg-gradient-to-br {
   background-image: linear-gradient(to bottom right, var(--tw-gradient-stops));
@@ -713,6 +810,9 @@ video {
 .pt-6 {
   padding-top: 1.5rem;
 }
+.pt-2 {
+  padding-top: 0.5rem;
+}
 .text-center {
   text-align: center;
 }
@@ -738,6 +838,13 @@ video {
   font-size: 0.75rem;
   line-height: 1rem;
 }
+.text-\[56px\] {
+  font-size: 56px;
+}
+.text-base {
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
 .font-bold {
   font-weight: 700;
 }
@@ -747,11 +854,17 @@ video {
 .font-semibold {
   font-weight: 600;
 }
+.leading-none {
+  line-height: 1;
+}
 .tracking-wide {
   letter-spacing: 0.025em;
 }
 .tracking-wider {
   letter-spacing: 0.05em;
+}
+.tracking-\[0\.25em\] {
+  letter-spacing: 0.25em;
 }
 .text-neon {
   color: var(--neon);
@@ -760,14 +873,17 @@ video {
   --tw-text-opacity: 1;
   color: rgb(255 255 255 / var(--tw-text-opacity, 1));
 }
+.text-opacity-60 {
+  --tw-text-opacity: 0.6;
+}
 .text-opacity-70 {
   --tw-text-opacity: 0.7;
 }
 .text-opacity-80 {
   --tw-text-opacity: 0.8;
 }
-.text-opacity-60 {
-  --tw-text-opacity: 0.6;
+.text-opacity-50 {
+  --tw-text-opacity: 0.5;
 }
 .shadow-glow {
   --tw-shadow: 0 0 20px var(--glow);
@@ -825,26 +941,56 @@ body {
   --tw-shadow: var(--tw-shadow-colored);
 }
 
+/* ピクセル風フォント（Press Start 2P） */
+.font-pixel {
+  font-family: var(--font-pixel), ui-monospace, Menlo, monospace;
+}
+
+/* タイトルのネオン発光を強める */
+.pixel-title {
+  text-shadow:
+    0 0 6px var(--neon),
+    0 0 12px var(--glow),
+    0 0 24px var(--glow),
+    0 0 36px var(--glow);
+}
 .hover\:bg-neon:hover {
   background-color: var(--neon);
 }
-
 .hover\:bg-opacity-10:hover {
   --tw-bg-opacity: 0.1;
 }
-
 @media (min-width: 768px) {
+
+  .md\:block {
+    display: block;
+  }
+
+  .md\:flex {
+    display: flex;
+  }
+
+  .md\:grid-cols-\[1fr_1px_1fr\] {
+    grid-template-columns: 1fr 1px 1fr;
+  }
 
   .md\:p-10 {
     padding: 2.5rem;
+  }
+
+  .md\:p-12 {
+    padding: 3rem;
   }
 
   .md\:text-7xl {
     font-size: 4.5rem;
     line-height: 1;
   }
-}
 
+  .md\:text-\[76px\] {
+    font-size: 76px;
+  }
+}
 @media (min-width: 1024px) {
 
   .lg\:col-span-2 {

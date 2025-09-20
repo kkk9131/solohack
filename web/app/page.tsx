@@ -18,7 +18,7 @@ export default function Home() {
   return (
     <main className="grid place-items-center min-h-dvh p-6 md:p-10">
       {/* ウィンドウ風コンテナ */}
-      <div className="w-full max-w-5xl bg-hud bg-opacity-80 border border-neon border-opacity-20 shadow-glow rounded-md overflow-hidden">
+      <div className="w-full max-w-5xl bg-hud bg-opacity-80 border border-neon border-opacity-20 rounded-md overflow-hidden">
         {/* タイトルバー */}
         <div className="flex items-center justify-between px-4 py-2 border-b border-neon border-opacity-20">
           <div className="text-neon text-opacity-80 text-sm">Welcome to Solo Hack</div>
