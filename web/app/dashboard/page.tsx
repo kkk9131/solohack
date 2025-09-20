@@ -16,7 +16,7 @@ export default function DashboardPage() {
         <h2 className="text-2xl font-bold neon-text">Dashboard</h2>
         <button
           onClick={() => setChatOpen(true)}
-          className="px-4 py-2 border border-neon/40 rounded-md text-neon hover:bg-neon/10 transition"
+          className="px-4 py-2 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10 transition"
         >
           Open Chat
         </button>
@@ -28,7 +28,7 @@ export default function DashboardPage() {
             <Avatar state={avatarState} size={80} />
             <div>
               <div className="text-neon font-semibold">AI Partner</div>
-              <div className="text-xs text-neon/70">Idle/Talk/Celebrate</div>
+              <div className="text-xs text-neon text-opacity-70">Idle/Talk/Celebrate</div>
             </div>
           </div>
           <HUDProgress value={40} />
@@ -48,7 +48,7 @@ export default function DashboardPage() {
 
       <section className="hud-card p-4">
         <motion.h3 className="text-neon mb-4">Tasks (placeholder)</motion.h3>
-        <div className="text-neon/70 text-sm">Supabase連携前のプレースホルダです。</div>
+        <div className="text-neon text-opacity-70 text-sm">Supabase連携前のプレースホルダです。</div>
       </section>
 
       <ChatPanel
@@ -59,4 +59,3 @@ export default function DashboardPage() {
     </main>
   );
 }
-

@@ -30,7 +30,7 @@ export default function Home() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
-          className="text-neon/80"
+          className="text-neon text-opacity-80"
         >
           Welcome to SoloHack
         </motion.p>
@@ -38,14 +38,14 @@ export default function Home() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.6 }}
-          className="text-sm text-neon/70"
+          className="text-sm text-neon text-opacity-70"
         >
           Press Enter to continue
         </motion.div>
         <div className="pt-6">
           <button
             onClick={() => router.push('/dashboard')}
-            className="px-6 py-3 border border-neon/40 rounded-md text-neon hover:bg-neon/10 transition shadow-glow"
+            className="px-6 py-3 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10 transition shadow-glow"
           >
             Continue
           </button>
@@ -54,4 +54,3 @@ export default function Home() {
     </main>
   );
 }
-

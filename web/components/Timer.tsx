@@ -43,8 +43,7 @@ export default function Timer({ minutes = 25, onFinish }: { minutes?: number; on
           style={{ width: `${percent}%`, transition: 'width 0.3s ease' }}
         />
       </div>
-      <div className="text-right text-neon/70 text-xs">{percent}%</div>
+      <div className="text-right text-neon text-opacity-70 text-xs">{percent}%</div>
     </div>
   );
 }
-

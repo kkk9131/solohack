@@ -31,7 +31,7 @@ export default function Avatar({
 
   return (
     <motion.div
-      className="rounded-md border border-neon/30 bg-hud/60 p-1"
+      className="rounded-md border border-neon border-opacity-30 bg-hud bg-opacity-60 p-1"
       animate={state === 'celebrate' ? { scale: [1, 1.08, 1] } : undefined}
       transition={{ duration: 1.2, ease: 'easeInOut' }}
       style={{ width: size + 8, height: size + 8 }}
@@ -45,4 +45,3 @@ export default function Avatar({
     </motion.div>
   );
 }
-

@@ -3,7 +3,7 @@ export default function HUDProgress({ value = 0 }: { value?: number }) {
   const clamped = Math.max(0, Math.min(100, value));
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between text-xs text-neon/70">
+      <div className="flex items-center justify-between text-xs text-neon text-opacity-70">
         <span>Progress</span>
         <span>{clamped}%</span>
       </div>
@@ -13,4 +13,3 @@ export default function HUDProgress({ value = 0 }: { value?: number }) {
     </div>
   );
 }
-

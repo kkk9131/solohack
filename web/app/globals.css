@@ -23,6 +23,5 @@ body {
 }
 
 .hud-card {
-  @apply bg-hud/70 rounded-lg border border-neon/20 shadow-glow;
+  @apply bg-hud bg-opacity-70 rounded-lg border border-neon border-opacity-20 shadow-glow;
 }
-
