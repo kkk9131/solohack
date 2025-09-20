@@ -28,10 +28,8 @@ export default function Home() {
             <span className="inline-block w-3 h-3 rounded-full bg-green-400/80" />
           </div>
         </div>
-        {/* 本文（縦仕切り付きレイアウト） */}
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_1px_1fr]">
-          {/* 左ペイン */}
-          <div className="p-8 md:p-12 flex flex-col items-center justify-center gap-6 text-center">
+        {/* 本文（単一ペイン） */}
+        <div className="p-8 md:p-12 flex flex-col items-center justify-center gap-6 text-center">
             <motion.h1
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
@@ -58,13 +56,7 @@ export default function Home() {
                 Continue
               </button>
             </div>
-          </div>
-          {/* 仕切り線 */}
-          <div className="hidden md:block bg-neon bg-opacity-20" />
-          {/* 右ペイン（空のスペース、将来的にヒント/クイックアクション等） */}
-          <div className="hidden md:flex items-center justify-center text-neon text-opacity-50">
-            {/* 予備スペース */}
-          </div>
+        </div>
         </div>
       </div>
     </main>
