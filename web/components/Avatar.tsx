@@ -40,7 +40,7 @@ export default function Avatar({
       {/* NOTE: 画像が未配置の場合に備えて背景グラデのプレースホルダ */}
       <div className="grid place-items-center bg-gradient-to-br from-hud to-bg" style={{ width: size, height: size }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt="avatar" width={size} height={size} className="object-contain" />
+        <img src={src} alt="avatar" width={size} height={size} className="object-contain pixelated" />
       </div>
     </motion.div>
   );

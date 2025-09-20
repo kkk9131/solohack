@@ -39,3 +39,8 @@ body {
     0 0 24px var(--glow),
     0 0 36px var(--glow);
 }
+
+/* ドット絵をシャープに表示 */
+.pixelated {
+  image-rendering: pixelated;
+}

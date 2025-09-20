@@ -37,6 +37,12 @@ npm run dev
 - Supabase（タスク/設定/RLS）
 - Avatar assets（`idle.png`/`talk.png`）の差し替えと `celebrate` 演出強化
 
+## アバター画像の配置
+- 推奨サイズ: 128x128px（透過PNG, アンチエイリアスなし, 1pxグリッド）
+- 必須: `web/public/avatars/default/idle.png`, `web/public/avatars/default/talk.png`
+- 任意: `web/public/avatars/default/celebrate.png`
+- 表示は `image-rendering: pixelated` でシャープにしています（`globals.css` の `.pixelated`）。
+
 ---
 - 仕様: `docs/WEB_REQUIREMENTS.md`
 - avatar-ui-core 連携方針: `docs/integrations/avatar-ui-core.md`
