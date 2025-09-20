@@ -15,69 +15,76 @@ export default function ChatPanel({
 }) {
   // 日本語メモ: SSEが使えない場合のフォールバックとしてタイプライターを保持。
   const { text: fallbackText, start, cancel } = useTypewriter({ delayMs: 40 });
-  const [text, setText] = useState('');
+  const [text, setText] = useState(''); // ストリーム中のAIテキスト
+  const [input, setInput] = useState('');
+  const [history, setHistory] = useState<{ role: 'user' | 'ai'; content: string }[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const [streaming, setStreaming] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-    let useFallback = false;
-    const run = async () => {
-      try {
-        setText('');
-        setStreaming(true);
-        onStreamingChange?.(true);
-        const ac = new AbortController();
-        abortRef.current = ac;
-        const res = await fetch('/api/chat/stream', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: '短く自己紹介をしてください。' }),
-          signal: ac.signal,
-        });
-        if (!res.ok || !res.body) throw new Error('SSE not available');
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buf = '';
-        for (;;) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          buf += decoder.decode(value, { stream: true });
-          const events = buf.split('\n\n');
-          buf = events.pop() ?? '';
-          for (const ev of events) {
-            const line = ev.split('\n').find((l) => l.startsWith('data: '));
-            if (!line) continue;
-            const payload = line.slice(6);
-            if (payload === '[DONE]') {
-              reader.cancel();
-              break;
-            }
-            try {
-              const obj = JSON.parse(payload) as { token?: string };
-              if (obj.token) setText((t) => t + obj.token);
-            } catch {}
-          }
-        }
-      } catch (e) {
-        useFallback = true;
-      } finally {
-        setStreaming(false);
-        onStreamingChange?.(false);
-        abortRef.current = null;
-        if (useFallback) {
-          // フォールバック：固定文をタイプライターで表示
-          start("Hello, I'm your AI partner. Let's hack it! ");
-        }
-      }
-    };
-    run();
     return () => {
       abortRef.current?.abort();
       cancel();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, cancel]);
+
+  async function sendMessage(message: string) {
+    if (!message.trim() || streaming) return;
+    // ユーザー発言を履歴追加
+    setHistory((h) => [...h, { role: 'user', content: message }]);
+    setText('');
+    setStreaming(true);
+    onStreamingChange?.(true);
+    let useFallback = false;
+    try {
+      const ac = new AbortController();
+      abortRef.current = ac;
+      const res = await fetch('/api/chat/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: message }),
+        signal: ac.signal,
+      });
+      if (!res.ok || !res.body) throw new Error('SSE not available');
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const events = buf.split('\n\n');
+        buf = events.pop() ?? '';
+        for (const ev of events) {
+          const line = ev.split('\n').find((l) => l.startsWith('data: '));
+          if (!line) continue;
+          const payload = line.slice(6);
+          if (payload === '[DONE]') {
+            reader.cancel();
+            break;
+          }
+          try {
+            const obj = JSON.parse(payload) as { token?: string };
+            if (obj.token) setText((t) => t + obj.token);
+          } catch {}
+        }
+      }
+    } catch {
+      useFallback = true;
+    } finally {
+      setStreaming(false);
+      onStreamingChange?.(false);
+      abortRef.current = null;
+      if (useFallback) {
+        await start("Sorry, streaming is unavailable. Here's a fallback response.");
+        setHistory((h) => [...h, { role: 'ai', content: fallbackText }]);
+      } else {
+        setHistory((h) => [...h, { role: 'ai', content: text }]);
+      }
+      setText('');
+    }
+  }
 
   return (
     <AnimatePresence>
@@ -98,15 +105,54 @@ export default function ChatPanel({
             </button>
           </div>
           <div className="grid grid-cols-[1fr_auto] gap-4 items-start">
-            <div className="min-h-[10rem] whitespace-pre-wrap text-sm">
-              {text || fallbackText}
-              <span className="inline-block w-2 h-4 bg-neon bg-opacity-70 align-bottom animate-typeCursor ml-0.5" />
+            <div className="min-h-[10rem] whitespace-pre-wrap text-sm space-y-3">
+              {history.map((m, i) => (
+                <div key={i} className={m.role === 'user' ? 'text-neon text-opacity-80' : ''}>
+                  <span className={m.role === 'user' ? 'text-neon' : 'text-neon text-opacity-70'}>
+                    {m.role === 'user' ? 'YOU>' : 'AI>'}
+                  </span>{' '}
+                  {m.content}
+                </div>
+              ))}
+              {streaming && (
+                <div>
+                  <span className="text-neon text-opacity-70">AI&gt;</span>{' '}
+                  {text}
+                  <span className="inline-block w-2 h-4 bg-neon bg-opacity-70 align-bottom animate-typeCursor ml-0.5" />
+                </div>
+              )}
             </div>
             <div className="pt-1">
               <Avatar state={streaming ? 'talk' : 'idle'} size={80} />
             </div>
           </div>
-          <div className="text-neon text-opacity-60 text-xs mt-4">Streaming mock. SSE統合で置換予定。</div>
+          {/* 入力欄 */}
+          <form
+            className="mt-4 flex items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const msg = input.trim();
+              if (!msg) return;
+              setInput('');
+              sendMessage(msg);
+            }}
+          >
+            <input
+              type="text"
+              className="flex-1 bg-bg text-white/90 placeholder:text-white/40 border border-neon border-opacity-20 rounded-md px-3 py-2 focus:outline-none focus:border-opacity-40"
+              placeholder="Type a message and press Enter"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              disabled={streaming}
+            />
+            <button
+              type="submit"
+              className="px-3 py-2 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10 disabled:opacity-50"
+              disabled={streaming}
+            >
+              Send
+            </button>
+          </form>
         </motion.aside>
       )}
     </AnimatePresence>
