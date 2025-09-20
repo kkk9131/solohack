@@ -11,6 +11,8 @@ npm run dev
 ```
 
 - 開発: http://localhost:3000
+- 環境変数（SSEで応答を受けるには少なくともどちらかを設定）
+  - `SOLOHACK_GEMINI_API_KEY=` または `GOOGLE_API_KEY=`
 - ルート:
   - `/` タイトル（Enter またはボタンで `/dashboard`）
   - `/dashboard` HUD（Avatar/Timer/Progress + Chat ドロワー）
