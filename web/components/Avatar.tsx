@@ -17,6 +17,7 @@ export default function Avatar({
 }) {
   // 日本語メモ: talk 中は idle/talk 画像を交互に切替。assets は後で差し替え。
   const [frame, setFrame] = useState<'idle' | 'talk'>('idle');
+  const [talkAvailable, setTalkAvailable] = useState(true);
   useEffect(() => {
     if (state !== 'talk') {
       setFrame('idle');
@@ -27,7 +28,10 @@ export default function Avatar({
     return () => clearInterval(id);
   }, [state, fps]);
 
-  const src = useMemo(() => (frame === 'idle' ? images.idle : images.talk), [frame, images]);
+  const src = useMemo(() => {
+    if (frame === 'talk' && talkAvailable) return images.talk;
+    return images.idle;
+  }, [frame, images, talkAvailable]);
 
   return (
     <motion.div
@@ -40,7 +44,14 @@ export default function Avatar({
       {/* NOTE: 画像が未配置の場合に備えて背景グラデのプレースホルダ */}
       <div className="grid place-items-center bg-gradient-to-br from-hud to-bg" style={{ width: size, height: size }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt="avatar" width={size} height={size} className="object-contain pixelated" />
+        <img
+          src={src}
+          alt="avatar"
+          width={size}
+          height={size}
+          className="object-contain pixelated"
+          onError={() => setTalkAvailable(false)}
+        />
       </div>
     </motion.div>
   );
