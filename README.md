@@ -35,12 +35,13 @@ Your AI partner for technical and motivational support.
   - `--mode tech`: Get technical advice and code examples.
   - `--mode coach`: Receive motivational support and encouragement.
 - **Customizable:** The AI's name and personality can be configured via a `.env` file.
+  - Env: `SOLOHACK_GEMINI_API_KEY` (or `GOOGLE_API_KEY`)
 
 ## Tech Stack
 
 - **Language:** Node.js, TypeScript
 - **CLI Framework:** Commander.js
-- **AI:** OpenAI API (gpt-4o-mini with streaming)
+- **AI:** Gemini (via `@google/generative-ai`)
 - **Data Storage:** Local JSON file for the MVP
 - **Testing:** Jest/Vitest
 

@@ -1,5 +1,4 @@
-import type { ClientOptions } from 'openai';
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 /**
  * ChatConfig: OpenAI クライアントの設定。
@@ -14,25 +13,21 @@ export interface ChatConfig {
 }
 
 /**
- * ChatClient: OpenAI の Responses API を最小限にラップ。
+ * ChatClient: Gemini を最小限にラップ。
  * 日本語メモ:
  * - コスト最適化のため、テストでは API 呼び出しをモック化します。
  * - ストリーミング表示は CLI 層での対応が必要（本クラスは同期的に文字列を返す）。
  */
 export class ChatClient {
-  private openai: OpenAI;
+  private genAI: GoogleGenerativeAI;
   private config: ChatConfig;
 
   constructor(config: ChatConfig) {
     if (!config.apiKey) {
-      throw new Error('OpenAI API key is required for chat operations.');
+      throw new Error('Gemini API key is required for chat operations.');
     }
 
-    const options: ClientOptions = {
-      apiKey: config.apiKey,
-    };
-
-    this.openai = new OpenAI(options);
+    this.genAI = new GoogleGenerativeAI(config.apiKey);
     this.config = config;
   }
 
@@ -42,11 +37,12 @@ export class ChatClient {
    */
   async ask(question: string): Promise<string> {
     // 日本語メモ: 実APIはコストがかかるため、CI/ユニットテストではモック化推奨。
-    const response = await this.openai.responses.create({
-      model: 'gpt-4o-mini',
-      input: `Mode: ${this.config.mode ?? 'tech'}\n${question}`,
-    });
-
-    return response.output_text ?? 'No response text available.';
+    const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const persona = this.config.assistantName ? `Assistant: ${this.config.assistantName}` : 'Assistant: SoloBuddy';
+    const mode = this.config.mode ?? 'tech';
+    const prompt = `${persona}\nMode: ${mode}\n\n${question}`;
+    const result = await model.generateContent(prompt);
+    const text = result?.response?.text?.();
+    return text ?? 'No response text available.';
   }
 }

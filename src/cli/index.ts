@@ -98,10 +98,10 @@ timerCmd
   .command('start')
   .argument('[minutes]', 'Duration in minutes', (value) => Number.parseInt(value, 10), 25)
   .description('Start a pomodoro timer.')
-  .action((minutes: number) => {
-    // 日本語メモ: 実時間は永続化により算出。開始時刻と秒数を保存する。
+  .action(async (minutes: number) => {
+    // 日本語メモ: 永続化の完了を待たないとプロセス終了で書き込みが落ちる可能性があるため await する。
     const durationSeconds = minutes * 60;
-    void saveTimer({ startedAt: Date.now(), durationSeconds });
+    await saveTimer({ startedAt: Date.now(), durationSeconds });
     console.log(`Started a ${minutes}-minute pomodoro.`);
   });
 
@@ -183,10 +183,10 @@ program
   .option('--mode <mode>', 'Chat mode (tech|coach)', 'tech')
   .description('Talk with your AI partner.')
   .action(async (questionWords: string[], options: { mode: 'tech' | 'coach' }) => {
-    const apiKey = process.env.SOLOHACK_OPENAI_KEY;
+    const apiKey = process.env.SOLOHACK_GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 
     if (!apiKey) {
-      console.error('Missing SOLOHACK_OPENAI_KEY in environment.');
+      console.error('Missing SOLOHACK_GEMINI_API_KEY (or GOOGLE_API_KEY) in environment.');
       process.exitCode = 1;
       return;
     }

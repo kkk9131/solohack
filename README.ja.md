@@ -34,12 +34,13 @@ AIの相棒が開発の相談に乗ったり、モチベーションを支援し
   - `--mode tech`: 技術的なアドバイスやコード例を返します。
   - `--mode coach`: モチベーションを維持するための励ましの言葉を返します。
 - **カスタマイズ:** `.env` ファイルでAIの名前や口調を設定できます。
+  - 環境変数: `SOLOHACK_GEMINI_API_KEY`（または `GOOGLE_API_KEY`）
 
 ## 技術スタック
 
 - **言語:** Node.js, TypeScript
 - **CLIフレームワーク:** Commander.js
-- **AI:** OpenAI API (gpt-4o-mini, ストリーミング対応)
+- **AI:** Gemini（`@google/generative-ai` 利用）
 - **データ保存:** ローカルJSONファイル（MVP）
 - **テスト:** Jest/Vitest
 

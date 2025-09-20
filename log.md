@@ -22,3 +22,5 @@
 - 2025-09-20 08時 タイマーのstatus/stopコマンドと永続化を実装。storageの統合API追加、テスト拡充・カバレッジ維持。
 - 2025-09-20 08時 タイマーresetコマンドを追加し、README/Docsを更新。
 - 2025-09-20 08時 タイマーにextend機能を追加し、status表示をプログレスバー+割合で視認性改善。Docs/README更新。
+- 2025-09-20 08時 timer startで保存処理をawaitに変更（即時終了時の書き込み落ち対策）。使い方を1行で案内。
+- 2025-09-20 08時 AIチャットをGemini(@google/generative-ai)対応に変更。環境変数/README/AGENTS/.env.example/テストを更新。
