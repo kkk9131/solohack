@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "avatars:build": "node scripts/resize-avatars.mjs"
+    "avatars:build": "node scripts/resize-avatars.mjs",
+    "avatars:check": "node scripts/check-avatars.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.11.0",
