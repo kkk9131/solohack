@@ -21,7 +21,6 @@ loadEnv();
 
 const program = new Command();
 let tasks: TaskManager; // 日本語メモ: フックで永続化から読み込んで初期化する。
-const timer = new PomodoroTimer();
 
 program
   .name('solohack')
