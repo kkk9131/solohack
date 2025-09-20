@@ -55,11 +55,14 @@ export default function ChatPanel({
     sound: { enabled: soundEnabled, freq: soundFreq, volume: soundVolume, endVolume: soundEndVolume, durationMs: soundDuration, step: soundStep },
   });
   const [input, setInput] = useState('');
+  const [showCmds, setShowCmds] = useState(false);
+  const [cmdIndex, setCmdIndex] = useState(0);
   const [history, setHistory] = useState<{ role: 'user' | 'ai' | 'system'; content: string }[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const [typingFallback, setTypingFallback] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const cmdRef = useRef<HTMLDivElement | null>(null);
 
   // 自動スクロール（新しいテキスト/履歴/フォールバックの変化時に最下部へ）
   useEffect(() => {
@@ -101,6 +104,45 @@ export default function ChatPanel({
       default:
         return `Unknown command: /${cmd}`;
     }
+  }
+
+  type CmdItem = { label: string; cmd: string };
+  const baseSuggestions: CmdItem[] = [
+    { label: 'help — コマンド一覧', cmd: '/help' },
+    { label: 'sound on — タイプ音ON', cmd: '/sound on' },
+    { label: 'sound off — タイプ音OFF', cmd: '/sound off' },
+    { label: 'speed instant — 即時', cmd: '/speed instant' },
+    { label: 'speed fast — 速い', cmd: '/speed fast' },
+    { label: 'speed normal — 普通', cmd: '/speed normal' },
+    { label: 'speed slow — 遅い', cmd: '/speed slow' },
+    { label: 'speed slower — もっと遅い', cmd: '/speed slower' },
+    { label: 'speed <ms> — 任意速度', cmd: '/speed <ms>' },
+  ];
+  const suggestions = useMemo<CmdItem[]>(() => {
+    if (!input.startsWith('/')) return [];
+    const q = input.slice(1).toLowerCase();
+    if (!q) return baseSuggestions;
+    return baseSuggestions.filter((s) => s.cmd.slice(1).startsWith(q) || s.label.toLowerCase().includes(q));
+  }, [input]);
+
+  function executeSuggestion(item: CmdItem) {
+    if (item.cmd.includes('<ms>')) {
+      const val = prompt('表示速度(ms/文字)を入力してください', String(ssePace));
+      if (!val) return;
+      const ms = Number(val);
+      if (!Number.isFinite(ms) || ms < 0) {
+        setHistory((h) => [...h, { role: 'system', content: 'Usage: /speed <ms>' }]);
+      } else {
+        const res = parseCommand(`/speed ${ms}`);
+        if (res) setHistory((h) => [...h, { role: 'system', content: res }]);
+      }
+    } else {
+      const res = parseCommand(item.cmd);
+      if (res) setHistory((h) => [...h, { role: 'system', content: res }]);
+    }
+    setShowCmds(false);
+    setCmdIndex(0);
+    setInput('');
   }
 
   async function sendMessage(message: string) {
@@ -220,7 +262,7 @@ export default function ChatPanel({
           <div ref={bottomRef} />
           {/* 入力欄 */}
           <form
-            className="mt-4 flex items-center gap-2"
+            className="mt-4 flex items-center gap-2 relative"
             onSubmit={(e) => {
               e.preventDefault();
               const msg = input.trim();
@@ -234,7 +276,32 @@ export default function ChatPanel({
               className="flex-1 bg-bg text-white/90 placeholder:text-white/40 border border-neon border-opacity-20 rounded-md px-3 py-2 focus:outline-none focus:border-opacity-40"
               placeholder="Type a message and press Enter"
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setInput(v);
+                if (v.startsWith('/')) {
+                  setShowCmds(true);
+                  setCmdIndex(0);
+                } else {
+                  setShowCmds(false);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (!showCmds) return;
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  setCmdIndex((i) => (i + 1) % Math.max(1, suggestions.length));
+                } else if (e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  setCmdIndex((i) => (i - 1 + Math.max(1, suggestions.length)) % Math.max(1, suggestions.length));
+                } else if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (suggestions.length) executeSuggestion(suggestions[Math.max(0, Math.min(cmdIndex, suggestions.length - 1))]);
+                } else if (e.key === 'Escape') {
+                  e.preventDefault();
+                  setShowCmds(false);
+                }
+              }}
               disabled={streaming}
             />
             <button
@@ -244,6 +311,23 @@ export default function ChatPanel({
             >
               Send
             </button>
+
+            {/* Slash commands dropdown */}
+            {showCmds && suggestions.length > 0 && (
+              <div ref={cmdRef} className="absolute left-0 right-0 -bottom-2 translate-y-full bg-hud bg-opacity-95 border border-neon border-opacity-20 rounded-md shadow-glow z-50">
+                {suggestions.map((s, idx) => (
+                  <div
+                    key={s.label}
+                    className={`px-3 py-2 text-sm cursor-pointer ${idx === cmdIndex ? 'bg-neon bg-opacity-10' : ''}`}
+                    onMouseEnter={() => setCmdIndex(idx)}
+                    onMouseDown={(e) => { e.preventDefault(); executeSuggestion(s); }}
+                  >
+                    <span className="text-neon text-opacity-80">{s.cmd}</span>
+                    <span className="ml-2 text-neon text-opacity-60">— {s.label.split('—')[1]?.trim() || s.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </form>
         </motion.aside>
       )}
