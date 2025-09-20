@@ -1,7 +1,8 @@
 "use client";
 import { motion, AnimatePresence } from 'framer-motion';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import useTypewriter from '@/lib/useTypewriter';
+import Avatar from '@/components/Avatar';
 
 export default function ChatPanel({
   open,
@@ -12,13 +13,20 @@ export default function ChatPanel({
   onClose: () => void;
   onStreamingChange?: (streaming: boolean) => void;
 }) {
-  // 日本語メモ: MVP では固定メッセージをタイプライター表示。SSE統合時に置換。
-  const { text, start } = useTypewriter({ delayMs: 40 });
+  // 日本語メモ: MVP では固定メッセージをタイプライター表示。SSE統合時は置換。
+  const { text, start, cancel } = useTypewriter({ delayMs: 40 });
+  const [streaming, setStreaming] = useState(false);
 
   useEffect(() => {
     if (!open) return;
+    setStreaming(true);
     onStreamingChange?.(true);
-    start("Hello, I'm your AI partner. Let's hack it! ").finally(() => onStreamingChange?.(false));
+    start("Hello, I'm your AI partner. Let's hack it! ")
+      .finally(() => {
+        setStreaming(false);
+        onStreamingChange?.(false);
+      });
+    return () => cancel();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -40,9 +48,14 @@ export default function ChatPanel({
               Close
             </button>
           </div>
-          <div className="min-h-40 whitespace-pre-wrap text-sm">
-            {text}
-            <span className="inline-block w-2 h-4 bg-neon bg-opacity-70 align-bottom animate-typeCursor ml-0.5" />
+          <div className="grid grid-cols-[1fr_auto] gap-4 items-start">
+            <div className="min-h-[10rem] whitespace-pre-wrap text-sm">
+              {text}
+              <span className="inline-block w-2 h-4 bg-neon bg-opacity-70 align-bottom animate-typeCursor ml-0.5" />
+            </div>
+            <div className="pt-1">
+              <Avatar state={streaming ? 'talk' : 'idle'} size={80} />
+            </div>
           </div>
           <div className="text-neon text-opacity-60 text-xs mt-4">Streaming mock. SSE統合で置換予定。</div>
         </motion.aside>
