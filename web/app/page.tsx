@@ -6,11 +6,10 @@ import useTypewriter from '@/lib/useTypewriter';
 
 export default function Home() {
   const router = useRouter();
-  // タイトルとプロンプトのタイプライター（envで速度調整可能）
-  const envTitleDelay = Number(process.env.NEXT_PUBLIC_SOLOHACK_TITLE_DELAY_MS ?? process.env.NEXT_PUBLIC_SOLOHACK_STREAM_DELAY_MS);
-  const titleDelay = Number.isFinite(envTitleDelay) ? envTitleDelay : 60;
-  const { text: titleText, start: startTitle, cancel: cancelTitle } = useTypewriter({ delayMs: titleDelay });
-  const { text: promptText, start: startPrompt, cancel: cancelPrompt } = useTypewriter({ delayMs: titleDelay });
+  // タイトルを2行に分割してタイプライター（行ごとに確実に分離）
+  const { text: titleLine1, start: startTitle1 } = useTypewriter({ delayMs: 35 });
+  const { text: titleLine2, start: startTitle2 } = useTypewriter({ delayMs: 35 });
+  const { text: promptText, start: startPrompt } = useTypewriter({ delayMs: 20 });
 
   // 日本語メモ: Enter キーでダッシュボードへ遷移。
   useEffect(() => {
@@ -21,18 +20,16 @@ export default function Home() {
     return () => window.removeEventListener('keydown', onKey);
   }, [router]);
 
-  // 初回マウント時にタイプライター開始
+  // 初回マウント時にタイプライター開始（行ごとに分離）
   useEffect(() => {
+    let cancelled = false;
     (async () => {
-      await startTitle('SOLO\nHACK');
-      await startPrompt('Press Enter to continue');
+      await startTitle1('SOLO');
+      if (!cancelled) await startTitle2('HACK');
+      if (!cancelled) await startPrompt('Press Enter to continue');
     })();
-    return () => {
-      // StrictMode での初回アンマウント時に前回ループを確実に停止
-      cancelTitle();
-      cancelPrompt();
-    };
-  }, [startTitle, startPrompt, cancelTitle, cancelPrompt]);
+    return () => { cancelled = true; };
+  }, [startTitle1, startTitle2, startPrompt]);
 
   return (
     <main className="grid place-items-center min-h-dvh p-6 md:p-10">
@@ -53,9 +50,16 @@ export default function Home() {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
-              className="font-pixel pixel-title text-neon text-[56px] md:text-[76px] leading-none tracking-[0.25em]"
+              className="font-dot pixel-title text-neon"
             >
-              <span className="whitespace-pre-line">{titleText || ' '}</span>
+              <span className="flex flex-col items-center gap-6">
+                <span className="block text-[28px] sm:text-[36px] md:text-[52px] leading-none tracking-[0.08em] md:tracking-[0.14em]">
+                  {titleLine1 || ' '}
+                </span>
+                <span className="block text-[28px] sm:text-[36px] md:text-[52px] leading-none tracking-[0.08em] md:tracking-[0.14em]">
+                  {titleLine2 || ' '}
+                </span>
+              </span>
             </motion.h1>
             <motion.div
               initial={{ opacity: 0 }}

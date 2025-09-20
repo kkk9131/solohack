@@ -6,3 +6,8 @@ coverage
 storage/*.json
 .env
 .env.local
+web/.env.local
+web/.next
+
+# YoYo AI version control directory
+.yoyo/
