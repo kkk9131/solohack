@@ -33,6 +33,9 @@ AIの相棒が開発の相談に乗ったり、モチベーションを支援し
 - **モード切替:**
   - `--mode tech`: 技術的なアドバイスやコード例を返します。
   - `--mode coach`: モチベーションを維持するための励ましの言葉を返します。
+ - **口調プリセット:** `--tone "丁寧・前向き・簡潔"` のように指定できます。`.env` の `SOLOHACK_ASSISTANT_TONE` でも設定可能です。
+- **ストリーミング:** 既定でストリーミング表示します。まとめて表示したい場合は `--no-stream` を付与します。
+ - **速度調整:** `--speed instant|fast|normal|slow`（既定: `slow`）や `--delay <ms>` でタイプライター速度を変更できます。環境変数 `SOLOHACK_STREAM_DELAY_MS` も利用可。
 - **カスタマイズ:** `.env` ファイルでAIの名前や口調を設定できます。
   - 環境変数: `SOLOHACK_GEMINI_API_KEY`（または `GOOGLE_API_KEY`）
 

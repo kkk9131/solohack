@@ -54,6 +54,13 @@ describe('storage JSON persistence', () => {
     expect(tasks).toEqual([]);
   });
 
+  it('returns empty when file exists but is empty', async () => {
+    const { loadTasks } = await importStorage();
+    await fs.writeFile(storageFile, '\n', 'utf8');
+    const tasks = await loadTasks();
+    expect(tasks).toEqual([]);
+  });
+
   it('saves and loads timer, and preserves across saveTasks', async () => {
     const { saveTimer, loadTimer, saveTasks, loadTasks } = await importStorage();
     const now = Date.now();

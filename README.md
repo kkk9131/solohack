@@ -34,6 +34,10 @@ Your AI partner for technical and motivational support.
 - **Modes:**
   - `--mode tech`: Get technical advice and code examples.
   - `--mode coach`: Receive motivational support and encouragement.
+ - **Tone preset:** `--tone "polite, concise, friendly"` or set `.env` `SOLOHACK_ASSISTANT_TONE`. Example: `--tone "丁寧・前向き・簡潔"`.
+- **Streaming:** Enabled by default. Use `--no-stream` to print the full answer at once.
+ - **Streaming:** Enabled by default. Use `--no-stream` to print the full answer at once.
+ - **Speed:** Control typewriter speed with `--speed instant|fast|normal|slow` (default: `slow`) or per-char `--delay <ms>`; env `SOLOHACK_STREAM_DELAY_MS` is also supported.
 - **Customizable:** The AI's name and personality can be configured via a `.env` file.
   - Env: `SOLOHACK_GEMINI_API_KEY` (or `GOOGLE_API_KEY`)
 

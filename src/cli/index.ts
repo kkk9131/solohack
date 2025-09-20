@@ -181,8 +181,15 @@ program
   .command('chat')
   .argument('<question...>', 'Ask the AI partner a question.')
   .option('--mode <mode>', 'Chat mode (tech|coach)', 'tech')
+  .option('--no-stream', 'Disable streaming output')
+  .option('--speed <speed>', 'Typewriter speed (instant|fast|normal|slow)', 'slow')
+  .option('--delay <ms>', 'Typewriter delay per character in ms (overrides --speed)', (v) => Number.parseInt(v, 10))
+  .option('--tone <tone>', 'Assistant tone preset, e.g., "丁寧・前向き・簡潔"')
   .description('Talk with your AI partner.')
-  .action(async (questionWords: string[], options: { mode: 'tech' | 'coach' }) => {
+  .action(async (
+    questionWords: string[],
+    options: { mode: 'tech' | 'coach'; stream?: boolean; noStream?: boolean; speed?: string; delay?: number; tone?: string },
+  ) => {
     const apiKey = process.env.SOLOHACK_GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 
     if (!apiKey) {
@@ -196,10 +203,37 @@ program
         apiKey,
         assistantName: process.env.SOLOHACK_ASSISTANT_NAME,
         mode: options.mode,
+        tone: options.tone ?? process.env.SOLOHACK_ASSISTANT_TONE,
       });
       const question = questionWords.join(' ');
-      const answer = await chatClient.ask(question);
-      console.log(answer);
+      const useStream = options.noStream ? false : true;
+      const speedMap: Record<string, number> = { instant: 0, fast: 5, normal: 12, slow: 25 };
+      const envDelay = process.env.SOLOHACK_STREAM_DELAY_MS ? Number.parseInt(process.env.SOLOHACK_STREAM_DELAY_MS, 10) : undefined;
+      const delay = Number.isFinite(options.delay)
+        ? (options.delay as number)
+        : (typeof envDelay === 'number' && Number.isFinite(envDelay) ? envDelay : speedMap[options.speed ?? 'slow'] ?? speedMap.slow);
+
+      const typewriterWrite = async (text: string, perCharMs: number) => {
+        if (perCharMs <= 0) {
+          process.stdout.write(text);
+          return;
+        }
+        for (const ch of text) {
+          process.stdout.write(ch);
+          // 日本語メモ: 非同期スリープでタイプライター風の間隔を実現。
+          await new Promise((r) => setTimeout(r, perCharMs));
+        }
+      };
+      if (useStream) {
+        // タイプライター風に逐次表示（速度は --delay または --speed / 環境変数で調整可能）
+        await chatClient.askStream(question, async (text) => {
+          await typewriterWrite(text, delay);
+        });
+        process.stdout.write('\n');
+      } else {
+        const answer = await chatClient.ask(question);
+        console.log(answer);
+      }
     } catch (error) {
       console.error((error as Error).message);
       process.exitCode = 1;

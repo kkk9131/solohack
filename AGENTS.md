@@ -34,7 +34,7 @@ Write Vitest specs alongside modules as `<name>.spec.ts`. Stub OpenAI calls with
 History currently shows a single “Initial commit”, so adopt Conventional Commit prefixes going forward (`feat:`, `fix:`, `docs:`). Keep messages in the imperative mood and wrap at ~72 chars. Pull requests must include: summary bullets, linked issues (or `n/a`), screenshots or recordings for UX changes, and notes on test coverage. Request review once CI passes and unresolved comments are addressed.
 
 ## Environment & Configuration
-Store AI credentials in `.env` (Gemini): `SOLOHACK_GEMINI_API_KEY` (or `GOOGLE_API_KEY`), and optional `SOLOHACK_ASSISTANT_NAME`. Never commit secrets; add `.env.example` updates instead. Document any new runtime toggles in README and surface thoughtful defaults in the CLI help output.
+Store AI credentials in `.env` (Gemini): `SOLOHACK_GEMINI_API_KEY` (or `GOOGLE_API_KEY`). Optional: `SOLOHACK_ASSISTANT_NAME` and `SOLOHACK_ASSISTANT_TONE` (e.g., "polite, concise, friendly"). Never commit secrets; update `.env.example` accordingly.
 
 ## Repo Logs
-Track work in `log.md`. Use hour-level timestamps like `YYYY-MM-DD HH時` (e.g., `2025-09-20 08時`). Keep entries short and action-focused.
+Track work in `log.md`. Use date-only timestamps like `YYYY-MM-DD` (e.g., `2025-09-20`). Keep entries short and action-focused.

@@ -10,6 +10,7 @@ export interface ChatConfig {
   apiKey?: string;
   assistantName?: string;
   mode?: 'tech' | 'coach';
+  tone?: string; // 日本語メモ: 口調のプリセット（例: "丁寧・前向き・簡潔"）
 }
 
 /**
@@ -40,9 +41,31 @@ export class ChatClient {
     const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     const persona = this.config.assistantName ? `Assistant: ${this.config.assistantName}` : 'Assistant: SoloBuddy';
     const mode = this.config.mode ?? 'tech';
-    const prompt = `${persona}\nMode: ${mode}\n\n${question}`;
+    const tone = this.config.tone ? `\nTone: ${this.config.tone}` : '';
+    const prompt = `${persona}\nMode: ${mode}${tone}\n\n${question}`;
     const result = await model.generateContent(prompt);
     const text = result?.response?.text?.();
     return text ?? 'No response text available.';
+  }
+
+  /**
+   * askStream: 応答をストリーミングで逐次受け取り、chunkテキストをコールバックに渡す。
+   */
+  async askStream(
+    question: string,
+    onChunk: (text: string) => void | Promise<void>,
+  ): Promise<void> {
+    const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const persona = this.config.assistantName ? `Assistant: ${this.config.assistantName}` : 'Assistant: SoloBuddy';
+    const mode = this.config.mode ?? 'tech';
+    const tone = this.config.tone ? `\nTone: ${this.config.tone}` : '';
+    const prompt = `${persona}\nMode: ${mode}${tone}\n\n${question}`;
+    const result = await model.generateContentStream(prompt);
+    for await (const chunk of result.stream) {
+      const t = (chunk as any)?.text?.();
+      if (t) await onChunk(t);
+    }
+    // 最終レスポンスの完了を待つ（不要なら省略可）
+    await result.response;
   }
 }

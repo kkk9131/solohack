@@ -1,26 +1,30 @@
 # 作業ログ
-- 2025-09-20 07時 AGENTS.md の既存内容を確認し、更新方針を整理。
-- 2025-09-20 08時 AGENTS.md を更新し、AGENTS.ja.md を作成。指示事項を反映した後、log.md を整備。
-- 2025-09-20 08時 ロードマップを整理し、docs/ROADMAP.md を作成してフェーズ別タスクを記述。
-- 2025-09-20 08時 プロジェクト初期設定としてディレクトリ生成、設定ファイル作成、CLI・コアモジュール・テストを追加。
-- 2025-09-20 08時 テストスクリプトを非ウォッチ実行に変更し、test:watch/test:ci を追加。
-- 2025-09-20 08時 ビルド/開発のウォッチスクリプト（build:watch, dev:watch）を追加。
-- 2025-09-20 08時 CLIのサブコマンド定義をネスト構造に修正（task/*, timer/*）。
-- 2025-09-20 08時 タスクのJSON永続化(storage/solohack.json)を実装し、pre/postActionで自動ロード/保存。
-- 2025-09-20 08時 学習向けの詳細な日本語コメントをコード一式に追加。AGENTS(英/日)をコメント方針やlog運用で更新。
-- 2025-09-20 08時 ロードマップをチェックリスト化し、実装済/未実装を明確化。
-- 2025-09-20 08時 GitHub ActionsのCIワークフロー(.github/workflows/ci.yml)を追加し、build/test/lintを自動化。
-- 2025-09-20 08時 CIを堅牢化（npm ci条件分岐、Node 22追加、concurrency、permissions）に更新。
-- 2025-09-20 08時 カバレッジ閾値(85%)を設定し、storage/chat/timerのテストを追加。達成をロードマップに反映。
-- 2025-09-20 08時 ブランチ feat/cli-persistence-ci-docs を作成し、コミットとプッシュを実施。
-- 2025-09-20 08時 ESLint設定をメタパッケージ非依存( parser/plugin 直指定 )に変更し、CI互換性を向上。
-- 2025-09-20 08時 CIの依存インストールをnpm ci優先+legacy-peer-deps、失敗時npm installへフォールバックに変更（ESLint peer依存対策）。
-- 2025-09-20 08時 mainをリモート最新へ同期し、ローカルのfeatureブランチを削除。
-- 2025-09-20 08時 CLIバイナリの短縮エイリアスslhを追加し、README/AGENTSを更新。
-- 2025-09-20 08時 README(英/日)のコマンド例をslhに統一（残存のsolohack例を置換）。
-- 2025-09-20 08時 CLI名をslhに揃えるため、help注記・docs置換・README開発者向け補足・npm run link を追加。
-- 2025-09-20 08時 タイマーのstatus/stopコマンドと永続化を実装。storageの統合API追加、テスト拡充・カバレッジ維持。
-- 2025-09-20 08時 タイマーresetコマンドを追加し、README/Docsを更新。
-- 2025-09-20 08時 タイマーにextend機能を追加し、status表示をプログレスバー+割合で視認性改善。Docs/README更新。
-- 2025-09-20 08時 timer startで保存処理をawaitに変更（即時終了時の書き込み落ち対策）。使い方を1行で案内。
-- 2025-09-20 08時 AIチャットをGemini(@google/generative-ai)対応に変更。環境変数/README/AGENTS/.env.example/テストを更新。
+- 2025-09-20 AGENTS.md の既存内容を確認し、更新方針を整理。
+- 2025-09-20 AGENTS.md を更新し、AGENTS.ja.md を作成。指示事項を反映した後、log.md を整備。
+- 2025-09-20 ロードマップを整理し、docs/ROADMAP.md を作成してフェーズ別タスクを記述。
+- 2025-09-20 プロジェクト初期設定としてディレクトリ生成、設定ファイル作成、CLI・コアモジュール・テストを追加。
+- 2025-09-20 テストスクリプトを非ウォッチ実行に変更し、test:watch/test:ci を追加。
+- 2025-09-20 ビルド/開発のウォッチスクリプト（build:watch, dev:watch）を追加。
+- 2025-09-20 CLIのサブコマンド定義をネスト構造に修正（task/*, timer/*）。
+- 2025-09-20 タスクのJSON永続化(storage/solohack.json)を実装し、pre/postActionで自動ロード/保存。
+- 2025-09-20 学習向けの詳細な日本語コメントをコード一式に追加。AGENTS(英/日)をコメント方針やlog運用で更新。
+- 2025-09-20 ロードマップをチェックリスト化し、実装済/未実装を明確化。
+- 2025-09-20 GitHub ActionsのCIワークフロー(.github/workflows/ci.yml)を追加し、build/test/lintを自動化。
+- 2025-09-20 CIを堅牢化（npm ci条件分岐、Node 22追加、concurrency、permissions）に更新。
+- 2025-09-20 カバレッジ閾値(85%)を設定し、storage/chat/timerのテストを追加。達成をロードマップに反映。
+- 2025-09-20 ブランチ feat/cli-persistence-ci-docs を作成し、コミットとプッシュを実施。
+- 2025-09-20 ESLint設定をメタパッケージ非依存( parser/plugin 直指定 )に変更し、CI互換性を向上。
+- 2025-09-20 CIの依存インストールをnpm ci優先+legacy-peer-deps、失敗時npm installへフォールバックに変更（ESLint peer依存対策）。
+- 2025-09-20 mainをリモート最新へ同期し、ローカルのfeatureブランチを削除。
+- 2025-09-20 CLIバイナリの短縮エイリアスslhを追加し、README/AGENTSを更新。
+- 2025-09-20 README(英/日)のコマンド例をslhに統一（残存のsolohack例を置換）。
+- 2025-09-20 CLI名をslhに揃えるため、help注記・docs置換・README開発者向け補足・npm run link を追加。
+- 2025-09-20 タイマーのstatus/stopコマンドと永続化を実装。storageの統合API追加、テスト拡充・カバレッジ維持。
+- 2025-09-20 タイマーresetコマンドを追加し、README/Docsを更新。
+- 2025-09-20 タイマーにextend機能を追加し、status表示をプログレスバー+割合で視認性改善。Docs/README更新。
+- 2025-09-20 timer startで保存処理をawaitに変更（即時終了時の書き込み落ち対策）。使い方を1行で案内。
+- 2025-09-20 AIチャットをGemini(@google/generative-ai)対応に変更。環境変数/README/AGENTS/.env.example/テストを更新。
+- 2025-09-20 チャットのストリーミングをテストでカバーし、storageの分岐テストを追加。ブランチカバレッジを閾値超に回復。
+- 2025-09-20 タイプライター遅延の型整合のためテストを調整。
+- 2025-09-20 口調プリセット(--tone/ENV)を追加。README/AGENTS/.env.example更新。
+- 2025-09-20 ロードマップを最新進捗に更新（Gemini/ストリーミング/タイプライター/トーン/タイマー拡張/slh alias）。
