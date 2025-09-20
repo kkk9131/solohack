@@ -35,9 +35,16 @@ SoloHack はソロ開発をゲーム感覚で継続できる体験を提供す�
   - [x] web/ 配下に雛形を追加（タイトル/ダッシュボード/設定、Avatar/Timer/Chatの最小実装）
 - [x] テーマトークン定義（黒/ネオン・グロー・HUD）とベースレイアウト
 - [x] `Avatar` コンポーネント（idle/talk/celebrate、発光演出）
-- [ ] `useTypewriter`（SSEトークン追従・音声ON/OFF）
+- [ ] `useTypewriter`（音声ON/OFF、SSE統合ユーティリティ化）
 - [x] Chat サーバー（Gemini SSE プロキシ）/ クライアント（右ドロワー＋入力欄）
-- [ ] タイマー（カウントダウン＋祝福演出とAvatar連動）
+  - [x] SSE ペース調整（`NEXT_PUBLIC_SOLOHACK_SSE_PACE_MS`）
+  - [x] 自動スクロール追従
+- [x] タイマー（カウントダウン＋祝福演出とAvatar連動）
+  - [x] 完了時のネオンフラッシュ演出 + celebrate
+  - [x] Avatar celebrate → idle 自動復帰
+  
+  
+- [x] アバター画像パイプライン（sharpで resize/trim、`npm run avatars:check/build`）
 - [ ] タスク CRUD（Supabase + RLS、HUD進捗）
 - [ ] 設定画面（AI名/口調、テーマ、ストリーム既定、遅延ms）
 - [ ] スモークE2E（タイトル→ダッシュボード→チャット/設定）
