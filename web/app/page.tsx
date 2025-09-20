@@ -7,8 +7,8 @@ import useTypewriter from '@/lib/useTypewriter';
 export default function Home() {
   const router = useRouter();
   // タイトルとプロンプトのタイプライター
-  const { text: titleText, start: startTitle } = useTypewriter({ delayMs: 35 });
-  const { text: promptText, start: startPrompt } = useTypewriter({ delayMs: 20 });
+  const { text: titleText, start: startTitle, cancel: cancelTitle } = useTypewriter({ delayMs: 35 });
+  const { text: promptText, start: startPrompt, cancel: cancelPrompt } = useTypewriter({ delayMs: 20 });
 
   // 日本語メモ: Enter キーでダッシュボードへ遷移。
   useEffect(() => {
@@ -21,15 +21,20 @@ export default function Home() {
 
   // 初回マウント時にタイプライター開始
   useEffect(() => {
-    let cancelled = false;
+    // StrictMode の再マウントやHMRに備え、開始済みをグローバルに記録
+    const key = '__slh_title_typed__';
+    if (typeof window !== 'undefined' && (window as any)[key]) return;
+    if (typeof window !== 'undefined') (window as any)[key] = true;
+
     (async () => {
       await startTitle('SOLO\nHACK');
-      if (!cancelled) await startPrompt('Press Enter to continue');
+      await startPrompt('Press Enter to continue');
     })();
     return () => {
-      cancelled = true;
+      cancelTitle();
+      cancelPrompt();
     };
-  }, [startTitle, startPrompt]);
+  }, [startTitle, startPrompt, cancelTitle, cancelPrompt]);
 
   return (
     <main className="grid place-items-center min-h-dvh p-6 md:p-10">
