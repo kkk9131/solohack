@@ -4,7 +4,7 @@ SoloHack はソロ開発をゲーム感覚で継続できる体験を提供す�
 ## フェーズ0: CLI MVP 安定化 (現行)
 - [x] タスク管理コマンド（`task add/list/done/remove`）の実装
 - [x] タイマー最小実装（`timer start <minutes>`）
-- [x] AI チャット最小実装（`chat`、`.env` 経由で OpenAI）
+- [x] AI チャット最小実装（`chat`、`.env` 経由で Gemini）
 - [x] JSON 永続化（`storage/solohack.json`、pre/postAction による自動ロード/保存）
 - [x] `src/core/` と `src/cli/` の分離（I/O は CLI 層へ）
 - [x] Vitest 導入と基本ユニットテスト
@@ -13,11 +13,15 @@ SoloHack はソロ開発をゲーム感覚で継続できる体験を提供す�
 - [x] `.env.example` の整備
 - [x] ガイドライン（AGENTS 英/日）とロードマップの作成
 - [x] CI の堅牢化（npm ci 条件分岐 / Node 22 追加 / concurrency / permissions）
+- [x] タイマー拡張（status/stop/reset/extend、進捗バー/割合表示）
+- [x] チャット拡張（Gemini へ置換、ストリーミング対応、タイプライター速度調整）
+- [x] 口調プリセット（`--tone` / `SOLOHACK_ASSISTANT_TONE`）
+- [x] CLI バイナリ短縮エイリアス `slh` の追加
 
 ## フェーズ1: 開発者体験の強化
 - [ ] CLI ヘルプの拡充（例・既定値の明示、`--help` 整備）
 - [ ] シェル補完（zsh/bash）対応の検討・実装
-- [ ] 進捗演出（タイプライター表示・装飾）の導入
+- [x] 進捗演出（ストリーミング・タイプライター、速度調整）
 - [x] 学習向け日本語コメントの体系化・コード反映（初期対応済み）
 - [ ] ストレージ抽象化（インターフェイス化し差し替え容易に）
 - [ ] プロジェクトボード運用とロードマップの定期更新フロー確立

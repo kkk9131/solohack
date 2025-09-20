@@ -13,9 +13,8 @@
 import { Command } from 'commander';
 import { config as loadEnv } from 'dotenv';
 import { TaskManager } from '../core/taskManager.js';
-import { PomodoroTimer } from '../core/timer.js';
 import { ChatClient } from '../core/chat.js';
-import { loadTasks, saveTasks } from '../core/storage.js';
+import { loadTasks, saveTasks, saveTimer, loadTimer } from '../core/storage.js';
 
 loadEnv();
 
@@ -99,23 +98,102 @@ timerCmd
   .command('start')
   .argument('[minutes]', 'Duration in minutes', (value) => Number.parseInt(value, 10), 25)
   .description('Start a pomodoro timer.')
-  .action((minutes: number) => {
-    // 日本語メモ: タイマーの実時間連携は今後実装。ここでは状態リセットのイメージを掴む。
-    const localTimer = new PomodoroTimer(minutes);
-    localTimer.start();
+  .action(async (minutes: number) => {
+    // 日本語メモ: 永続化の完了を待たないとプロセス終了で書き込みが落ちる可能性があるため await する。
+    const durationSeconds = minutes * 60;
+    await saveTimer({ startedAt: Date.now(), durationSeconds });
     console.log(`Started a ${minutes}-minute pomodoro.`);
+  });
+
+timerCmd
+  .command('status')
+  .description('Show remaining time if a timer is running.')
+  .action(async () => {
+    const t = await loadTimer();
+    if (!t) {
+      console.log('No timer running.');
+      return;
+    }
+    const now = Date.now();
+    const elapsed = Math.max(0, Math.floor((now - t.startedAt) / 1000));
+    const remaining = Math.max(0, t.durationSeconds - elapsed);
+    const fmt = (sec: number) => {
+      const mm = Math.floor(sec / 60).toString().padStart(2, '0');
+      const ss = (sec % 60).toString().padStart(2, '0');
+      return `${mm}:${ss}`;
+    };
+
+    if (remaining <= 0) {
+      console.log('✅ Timer finished.');
+      return;
+    }
+
+    const barWidth = 20;
+    const ratio = Math.min(1, t.durationSeconds === 0 ? 1 : elapsed / t.durationSeconds);
+    const filled = Math.max(0, Math.min(barWidth, Math.round(barWidth * ratio)));
+    const empty = barWidth - filled;
+    const percent = Math.round(ratio * 100);
+    const bar = `${'█'.repeat(filled)}${'-'.repeat(empty)}`;
+    console.log(`⏳ Remaining: ${fmt(remaining)} | [${bar}] ${percent}%`);
+  });
+
+timerCmd
+  .command('stop')
+  .description('Stop and clear the current timer if any.')
+  .action(async () => {
+    await saveTimer(undefined);
+    console.log('Timer cleared.');
+  });
+
+timerCmd
+  .command('reset')
+  .description('Reset and restart the current timer with its original duration.')
+  .action(async () => {
+    const t = await loadTimer();
+    if (!t) {
+      console.log('No timer to reset.');
+      return;
+    }
+    await saveTimer({ startedAt: Date.now(), durationSeconds: t.durationSeconds });
+    console.log('Timer reset.');
+  });
+
+timerCmd
+  .command('extend')
+  .argument('<minutes>', 'Additional minutes to extend', (v) => Number.parseInt(v, 10))
+  .description('Extend the running timer by the given minutes.')
+  .action(async (minutes: number) => {
+    if (!Number.isFinite(minutes) || minutes <= 0) {
+      console.log('Please provide a positive number of minutes.');
+      return;
+    }
+    const t = await loadTimer();
+    if (!t) {
+      console.log('No timer to extend.');
+      return;
+    }
+    const addSeconds = minutes * 60;
+    await saveTimer({ startedAt: t.startedAt, durationSeconds: t.durationSeconds + addSeconds });
+    console.log(`Extended by ${minutes} minute(s).`);
   });
 
 program
   .command('chat')
   .argument('<question...>', 'Ask the AI partner a question.')
   .option('--mode <mode>', 'Chat mode (tech|coach)', 'tech')
+  .option('--no-stream', 'Disable streaming output')
+  .option('--speed <speed>', 'Typewriter speed (instant|fast|normal|slow)', 'slow')
+  .option('--delay <ms>', 'Typewriter delay per character in ms (overrides --speed)', (v) => Number.parseInt(v, 10))
+  .option('--tone <tone>', 'Assistant tone preset, e.g., "丁寧・前向き・簡潔"')
   .description('Talk with your AI partner.')
-  .action(async (questionWords: string[], options: { mode: 'tech' | 'coach' }) => {
-    const apiKey = process.env.SOLOHACK_OPENAI_KEY;
+  .action(async (
+    questionWords: string[],
+    options: { mode: 'tech' | 'coach'; stream?: boolean; noStream?: boolean; speed?: string; delay?: number; tone?: string },
+  ) => {
+    const apiKey = process.env.SOLOHACK_GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 
     if (!apiKey) {
-      console.error('Missing SOLOHACK_OPENAI_KEY in environment.');
+      console.error('Missing SOLOHACK_GEMINI_API_KEY (or GOOGLE_API_KEY) in environment.');
       process.exitCode = 1;
       return;
     }
@@ -125,10 +203,37 @@ program
         apiKey,
         assistantName: process.env.SOLOHACK_ASSISTANT_NAME,
         mode: options.mode,
+        tone: options.tone ?? process.env.SOLOHACK_ASSISTANT_TONE,
       });
       const question = questionWords.join(' ');
-      const answer = await chatClient.ask(question);
-      console.log(answer);
+      const useStream = options.noStream ? false : true;
+      const speedMap: Record<string, number> = { instant: 0, fast: 5, normal: 12, slow: 25 };
+      const envDelay = process.env.SOLOHACK_STREAM_DELAY_MS ? Number.parseInt(process.env.SOLOHACK_STREAM_DELAY_MS, 10) : undefined;
+      const delay = Number.isFinite(options.delay)
+        ? (options.delay as number)
+        : (typeof envDelay === 'number' && Number.isFinite(envDelay) ? envDelay : speedMap[options.speed ?? 'slow'] ?? speedMap.slow);
+
+      const typewriterWrite = async (text: string, perCharMs: number) => {
+        if (perCharMs <= 0) {
+          process.stdout.write(text);
+          return;
+        }
+        for (const ch of text) {
+          process.stdout.write(ch);
+          // 日本語メモ: 非同期スリープでタイプライター風の間隔を実現。
+          await new Promise((r) => setTimeout(r, perCharMs));
+        }
+      };
+      if (useStream) {
+        // タイプライター風に逐次表示（速度は --delay または --speed / 環境変数で調整可能）
+        await chatClient.askStream(question, async (text) => {
+          await typewriterWrite(text, delay);
+        });
+        process.stdout.write('\n');
+      } else {
+        const answer = await chatClient.ask(question);
+        console.log(answer);
+      }
     } catch (error) {
       console.error((error as Error).message);
       process.exitCode = 1;

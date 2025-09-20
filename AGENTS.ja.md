@@ -34,7 +34,7 @@ TypeScript は strict モード、インデントはスペース 2、末尾カ�
 現在の履歴は「Initial commit」のみなので、今後は Conventional Commits のプレフィックス（`feat:`、`fix:`、`docs:` など）を採用し、命令形で約 72 文字に収めます。プルリクには要約箇条書き、関連 issue（なければ `n/a`）、UI 変更時のスクリーンショットや動画、テスト結果を必ず添付し、CI が通過してレビューコメントが解消されてからレビューを依頼してください。
 
 ## 環境設定
-AI 関連の資格情報は `.env` に保存し、`SOLOHACK_OPENAI_KEY` と任意の `SOLOHACK_ASSISTANT_NAME` を設定します。秘密情報はコミットせず、変更があれば `.env.example` を更新します。新しいランタイムフラグを導入する際は README に追記し、CLI のヘルプ出力にもわかりやすい既定値を示してください。
+AI 関連の資格情報は `.env` に保存し、Gemini を利用する場合は `SOLOHACK_GEMINI_API_KEY`（または `GOOGLE_API_KEY`）を設定します。任意で `SOLOHACK_ASSISTANT_NAME` と `SOLOHACK_ASSISTANT_TONE`（例: `丁寧・前向き・簡潔`）も設定可能です。秘密情報はコミットせず、変更があれば `.env.example` を更新します。
 
 ## 作業ログ
-作業は `log.md` に記録します。時刻は `YYYY-MM-DD HH時`（例: `2025-09-20 08時`）で、要点を箇条書きにまとめてください。
+作業は `log.md` に記録します。日付のみの `YYYY-MM-DD`（例: `2025-09-20`）で、要点を箇条書きにまとめてください。

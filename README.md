@@ -25,6 +25,8 @@ A countdown timer to help you focus.
 - `slh timer start 25`: Start a 25-minute timer.
 - `slh timer status`: Check the remaining time.
 - `slh timer stop`: Stop the timer.
+- `slh timer reset`: Reset the timer to the original duration and restart.
+- `slh timer extend 5`: Extend the running timer by 5 minutes.
 
 ### 3. AI Chat Partner
 Your AI partner for technical and motivational support.
@@ -32,13 +34,18 @@ Your AI partner for technical and motivational support.
 - **Modes:**
   - `--mode tech`: Get technical advice and code examples.
   - `--mode coach`: Receive motivational support and encouragement.
+ - **Tone preset:** `--tone "polite, concise, friendly"` or set `.env` `SOLOHACK_ASSISTANT_TONE`. Example: `--tone "丁寧・前向き・簡潔"`.
+- **Streaming:** Enabled by default. Use `--no-stream` to print the full answer at once.
+ - **Streaming:** Enabled by default. Use `--no-stream` to print the full answer at once.
+ - **Speed:** Control typewriter speed with `--speed instant|fast|normal|slow` (default: `slow`) or per-char `--delay <ms>`; env `SOLOHACK_STREAM_DELAY_MS` is also supported.
 - **Customizable:** The AI's name and personality can be configured via a `.env` file.
+  - Env: `SOLOHACK_GEMINI_API_KEY` (or `GOOGLE_API_KEY`)
 
 ## Tech Stack
 
 - **Language:** Node.js, TypeScript
 - **CLI Framework:** Commander.js
-- **AI:** OpenAI API (gpt-4o-mini with streaming)
+- **AI:** Gemini (via `@google/generative-ai`)
 - **Data Storage:** Local JSON file for the MVP
 - **Testing:** Jest/Vitest
 

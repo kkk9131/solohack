@@ -33,6 +33,8 @@ CLI版は、その最初の学習MVPとして位置づけられます。
 - `slh timer start 25` → 25分カウントダウン
 - `slh timer status` → 残り時間確認
 - `slh timer stop` → 停止
+- `slh timer reset` → 最初の設定時間にリセットして再開
+- `slh timer extend <min>` → 指定分数だけ延長
 - 終了時に演出
 
 #### AIチャット（相棒）

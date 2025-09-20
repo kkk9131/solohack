@@ -53,4 +53,46 @@ describe('storage JSON persistence', () => {
     const tasks = await loadTasks();
     expect(tasks).toEqual([]);
   });
+
+  it('returns empty when file exists but is empty', async () => {
+    const { loadTasks } = await importStorage();
+    await fs.writeFile(storageFile, '\n', 'utf8');
+    const tasks = await loadTasks();
+    expect(tasks).toEqual([]);
+  });
+
+  it('saves and loads timer, and preserves across saveTasks', async () => {
+    const { saveTimer, loadTimer, saveTasks, loadTasks } = await importStorage();
+    const now = Date.now();
+    await saveTimer({ startedAt: now, durationSeconds: 120 });
+    await saveTasks([{ id: 1, title: 'X', completed: false }]);
+    const timer = await loadTimer();
+    const tasks = await loadTasks();
+    expect(timer).toEqual({ startedAt: now, durationSeconds: 120 });
+    expect(tasks.length).toBe(1);
+  });
+
+  it('clears timer when undefined is passed', async () => {
+    const { saveTimer, loadTimer } = await importStorage();
+    await saveTimer({ startedAt: Date.now(), durationSeconds: 30 });
+    await saveTimer(undefined);
+    const t = await loadTimer();
+    expect(t).toBeUndefined();
+  });
+
+  it('uses default storage dir when env is not set', async () => {
+    // 日本語メモ: env を消して再importすると、デフォルトの ./storage を使用する。
+    delete process.env.SOLOHACK_STORAGE_DIR;
+    vi.resetModules();
+    const { saveTasks } = await import('../core/storage.js');
+    await saveTasks([]);
+    const defaultFile = path.join(process.cwd(), 'storage', 'solohack.json');
+    const exists = await fs
+      .access(defaultFile)
+      .then(() => true)
+      .catch(() => false);
+    expect(exists).toBe(true);
+    // 後始末: ファイル削除（ディレクトリは残しても可）
+    await fs.rm(defaultFile, { force: true });
+  });
 });

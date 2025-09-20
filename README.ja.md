@@ -24,6 +24,8 @@ AIの相棒が開発の相談に乗ったり、モチベーションを支援し
 - `slh timer start 25`: 25分のタイマーを開始します。
 - `slh timer status`: 残り時間を確認します。
 - `slh timer stop`: タイマーを停止します。
+- `slh timer reset`: タイマーを最初の設定時間にリセットして再開します。
+- `slh timer extend 5`: 実行中のタイマーを5分延長します。
 
 ### 3. AIチャット（相棒）
 技術的な相談からモチベーション維持まで、AIの相棒がサポートします。
@@ -31,13 +33,17 @@ AIの相棒が開発の相談に乗ったり、モチベーションを支援し
 - **モード切替:**
   - `--mode tech`: 技術的なアドバイスやコード例を返します。
   - `--mode coach`: モチベーションを維持するための励ましの言葉を返します。
+ - **口調プリセット:** `--tone "丁寧・前向き・簡潔"` のように指定できます。`.env` の `SOLOHACK_ASSISTANT_TONE` でも設定可能です。
+- **ストリーミング:** 既定でストリーミング表示します。まとめて表示したい場合は `--no-stream` を付与します。
+ - **速度調整:** `--speed instant|fast|normal|slow`（既定: `slow`）や `--delay <ms>` でタイプライター速度を変更できます。環境変数 `SOLOHACK_STREAM_DELAY_MS` も利用可。
 - **カスタマイズ:** `.env` ファイルでAIの名前や口調を設定できます。
+  - 環境変数: `SOLOHACK_GEMINI_API_KEY`（または `GOOGLE_API_KEY`）
 
 ## 技術スタック
 
 - **言語:** Node.js, TypeScript
 - **CLIフレームワーク:** Commander.js
-- **AI:** OpenAI API (gpt-4o-mini, ストリーミング対応)
+- **AI:** Gemini（`@google/generative-ai` 利用）
 - **データ保存:** ローカルJSONファイル（MVP）
 - **テスト:** Jest/Vitest
 
