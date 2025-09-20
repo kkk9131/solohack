@@ -1,6 +1,6 @@
 "use client";
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import Avatar from '@/components/Avatar';
 import ChatPanel from '@/components/ChatPanel';
 import Timer from '@/components/Timer';
@@ -9,6 +9,7 @@ import HUDProgress from '@/components/HUDProgress';
 export default function DashboardPage() {
   const [chatOpen, setChatOpen] = useState(false);
   const [avatarState, setAvatarState] = useState<'idle' | 'talk' | 'celebrate'>('idle');
+  const [flash, setFlash] = useState(false);
 
   return (
     <main className="min-h-dvh p-6 md:p-10 space-y-8">
@@ -40,7 +41,9 @@ export default function DashboardPage() {
             minutes={25}
             onFinish={() => {
               setAvatarState('celebrate');
+              setFlash(true);
               setTimeout(() => setAvatarState('idle'), 1600);
+              setTimeout(() => setFlash(false), 1000);
             }}
           />
         </div>
@@ -56,6 +59,20 @@ export default function DashboardPage() {
         onClose={() => setChatOpen(false)}
         onStreamingChange={(streaming) => setAvatarState(streaming ? 'talk' : 'idle')}
       />
+
+      {/* 祝福フラッシュ演出（簡易） */}
+      <AnimatePresence>
+        {flash && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.35 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4 }}
+            className="pointer-events-none fixed inset-0 bg-neon"
+            style={{ mixBlendMode: 'screen' }}
+          />
+        )}
+      </AnimatePresence>
     </main>
   );
 }

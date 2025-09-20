@@ -23,6 +23,12 @@ export default function ChatPanel({
   const [typingFallback, setTypingFallback] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const ssePace = Number(process.env.NEXT_PUBLIC_SOLOHACK_SSE_PACE_MS) || 0; // ms/char, 0=即時
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+
+  // 自動スクロール（新しいテキスト/履歴/フォールバックの変化時に最下部へ）
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [history, text, typingFallback, streaming]);
 
   useEffect(() => {
     if (!open) return;
@@ -141,7 +147,7 @@ export default function ChatPanel({
           animate={{ x: 0 }}
           exit={{ x: '100%' }}
           transition={{ type: 'spring', stiffness: 200, damping: 24 }}
-          className="fixed inset-y-0 right-0 w-full max-w-md bg-hud bg-opacity-95 border-l border-neon border-opacity-20 shadow-glow p-4 z-50"
+          className="fixed inset-y-0 right-0 w-full max-w-md bg-hud bg-opacity-95 border-l border-neon border-opacity-20 shadow-glow p-4 z-50 overflow-y-auto"
           role="dialog"
           aria-modal="true"
         >
@@ -173,6 +179,7 @@ export default function ChatPanel({
               <Avatar state={(streaming || typingFallback) ? 'talk' : 'idle'} size={112} />
             </div>
           </div>
+          <div ref={bottomRef} />
           {/* 入力欄 */}
           <form
             className="mt-4 flex items-center gap-2"
