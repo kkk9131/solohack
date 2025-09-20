@@ -13,22 +13,31 @@ export default function ChatPanel({
   onClose: () => void;
   onStreamingChange?: (streaming: boolean) => void;
 }) {
-  // 日本語メモ: SSEが使えない場合のフォールバックとしてタイプライターを保持。
+  // 日本語メモ: タイプライター + SSE ペーサ + 効果音（ENV制御）
   const fallbackDelay = Number(process.env.NEXT_PUBLIC_SOLOHACK_STREAM_DELAY_MS) || 60;
-  const { text: fallbackText, start, cancel } = useTypewriter({ delayMs: fallbackDelay });
-  const [text, setText] = useState(''); // ストリーム中のAIテキスト
+  const ssePace = Number(process.env.NEXT_PUBLIC_SOLOHACK_SSE_PACE_MS) || 0; // ms/char, 0=即時
+  const soundEnabled = String(process.env.NEXT_PUBLIC_SOLOHACK_SOUND_ENABLED).toLowerCase() === 'true';
+  const soundFreq = Number(process.env.NEXT_PUBLIC_SOLOHACK_SOUND_FREQ) || 1200;
+  const soundVolume = Number(process.env.NEXT_PUBLIC_SOLOHACK_SOUND_VOLUME) || 0.05;
+  const soundEndVolume = Number(process.env.NEXT_PUBLIC_SOLOHACK_SOUND_END_VOLUME) || 0.01;
+  const soundDuration = Number(process.env.NEXT_PUBLIC_SOLOHACK_SOUND_DURATION_MS) || 20;
+  const soundStep = Number(process.env.NEXT_PUBLIC_SOLOHACK_SOUND_STEP) || 2;
+  const { text: typeText, start, append, finalize, cancel } = useTypewriter({
+    delayMs: fallbackDelay,
+    paceMs: ssePace,
+    sound: { enabled: soundEnabled, freq: soundFreq, volume: soundVolume, endVolume: soundEndVolume, durationMs: soundDuration, step: soundStep },
+  });
   const [input, setInput] = useState('');
   const [history, setHistory] = useState<{ role: 'user' | 'ai'; content: string }[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const [typingFallback, setTypingFallback] = useState(false);
   const [streaming, setStreaming] = useState(false);
-  const ssePace = Number(process.env.NEXT_PUBLIC_SOLOHACK_SSE_PACE_MS) || 0; // ms/char, 0=即時
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   // 自動スクロール（新しいテキスト/履歴/フォールバックの変化時に最下部へ）
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [history, text, typingFallback, streaming]);
+  }, [history, typeText, typingFallback, streaming]);
 
   useEffect(() => {
     if (!open) return;
@@ -42,7 +51,8 @@ export default function ChatPanel({
     if (!message.trim() || streaming) return;
     // ユーザー発言を履歴追加
     setHistory((h) => [...h, { role: 'user', content: message }]);
-    setText('');
+    // 表示領域をクリア
+    // （useTypewriterはappendで追加、fallbackはstartで一括）
     setStreaming(true);
     onStreamingChange?.(true);
     let useFallback = false;
@@ -60,21 +70,6 @@ export default function ChatPanel({
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buf = '';
-      // ペーサ: SSEトークンを文字単位で一定間隔表示
-      let runnerActive = false;
-      let queue = '';
-      const runPacer = async () => {
-        if (runnerActive) return; // 既に動作中
-        runnerActive = true;
-        while (queue.length) {
-          const ch = queue[0];
-          queue = queue.slice(1);
-          collected += ch;
-          setText(collected);
-          if (ssePace > 0) await new Promise((r) => setTimeout(r, ssePace));
-        }
-        runnerActive = false;
-      };
       for (;;) {
         const { value, done } = await reader.read();
         if (done) break;
@@ -92,29 +87,13 @@ export default function ChatPanel({
           try {
             const obj = JSON.parse(payload) as { token?: string };
             if (obj.token) {
-              if (ssePace > 0) {
-                queue += obj.token;
-                // 非同期に処理（awaitしない）
-                void runPacer();
-              } else {
-                collected += obj.token;
-                setText(collected);
-              }
+              collected += obj.token;
+              append(obj.token);
             }
           } catch {}
         }
       }
-      // 残りのキューをフラッシュ
-      if (ssePace > 0) {
-        // ランナーが止まるまで待機
-        await new Promise<void>((resolve) => {
-          const tick = () => {
-            if (runnerActive || queue.length) setTimeout(tick, 16);
-            else resolve();
-          };
-          tick();
-        });
-      }
+      await finalize();
     } catch {
       useFallback = true;
     } finally {
@@ -170,7 +149,7 @@ export default function ChatPanel({
               {(streaming || typingFallback) && (
                 <div>
                   <span className="text-neon text-opacity-70">AI&gt;</span>{' '}
-                  {streaming ? text : fallbackText}
+                  {typeText}
                   <span className="inline-block w-2 h-4 bg-neon bg-opacity-70 align-bottom animate-typeCursor ml-0.5" />
                 </div>
               )}
