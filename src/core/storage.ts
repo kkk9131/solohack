@@ -9,7 +9,9 @@ import type { Task } from './taskManager.js';
  * - 将来的に XDG ベースやホームディレクトリ配下への移動を検討可能。
  * - 失敗時は「空配列を返す」ことで CLI が落ちないようにしている（堅牢性優先）。
  */
-const STORAGE_DIR = path.resolve(process.cwd(), 'storage');
+const STORAGE_DIR = process.env.SOLOHACK_STORAGE_DIR
+  ? path.resolve(process.env.SOLOHACK_STORAGE_DIR)
+  : path.resolve(process.cwd(), 'storage');
 const STORAGE_FILE = path.join(STORAGE_DIR, 'solohack.json');
 
 /**

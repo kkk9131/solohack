@@ -1,13 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 
-// 日本語メモ: storage.ts は import 時に process.cwd() を参照して保存先を決める。
-// そのため、テストでは一時ディレクトリに cwd を差し替えてから動的 import する。
+// 日本語メモ: SOLOHACK_STORAGE_DIR 環境変数を使って保存先を切り替える。
 
-const tmpRoot = path.resolve('tmp_storage_tests');
-const storageDir = path.join(tmpRoot, 'storage');
-const storageFile = path.join(storageDir, 'solohack.json');
+let tmpRoot: string;
+let storageFile: string;
 
 async function importStorage() {
   const mod = await import('../core/storage.js');
@@ -16,15 +15,14 @@ async function importStorage() {
 
 beforeEach(async () => {
   vi.resetModules();
-  // cwd を差し替え
-  vi.spyOn(process, 'cwd').mockReturnValue(tmpRoot);
-  await fs.mkdir(tmpRoot, { recursive: true });
-  // クリーンアップ
-  await fs.rm(storageDir, { recursive: true, force: true });
+  tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'solohack-'));
+  process.env.SOLOHACK_STORAGE_DIR = tmpRoot;
+  storageFile = path.join(tmpRoot, 'solohack.json');
+  await fs.rm(storageFile, { force: true });
 });
 
 afterEach(async () => {
-  vi.restoreAllMocks();
+  delete process.env.SOLOHACK_STORAGE_DIR;
   await fs.rm(tmpRoot, { recursive: true, force: true });
 });
 
@@ -49,11 +47,10 @@ describe('storage JSON persistence', () => {
   });
 
   it('returns empty when JSON is malformed', async () => {
-    await fs.mkdir(storageDir, { recursive: true });
+    await fs.mkdir(path.dirname(storageFile), { recursive: true });
     await fs.writeFile(storageFile, '{ invalid json', 'utf8');
     const { loadTasks } = await importStorage();
     const tasks = await loadTasks();
     expect(tasks).toEqual([]);
   });
 });
-
