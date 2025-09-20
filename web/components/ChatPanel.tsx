@@ -57,6 +57,7 @@ export default function ChatPanel({
   const [input, setInput] = useState('');
   const [showCmds, setShowCmds] = useState(false);
   const [cmdIndex, setCmdIndex] = useState(0);
+  const [cmdStage, setCmdStage] = useState<'root' | 'sound' | 'speed'>('root');
   const [history, setHistory] = useState<{ role: 'user' | 'ai' | 'system'; content: string }[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const [typingFallback, setTypingFallback] = useState(false);
@@ -245,7 +246,6 @@ export default function ChatPanel({
       } else {
         setHistory((h) => [...h, { role: 'ai', content: collected }]);
       }
-      setText('');
     }
   }
 
