@@ -67,3 +67,6 @@ SoloHackプロジェクトは、このCLI版から始まり、将来的には以
 
 - Bash: `slh completion bash > ~/.slh-completion.bash && echo 'source ~/.slh-completion.bash' >> ~/.bashrc`
 - Zsh:  `slh completion zsh > ~/.slh-completion.zsh && echo 'source ~/.slh-completion.zsh' >> ~/.zshrc`
+### 4. コマンドパレット
+インタラクティブなスラッシュメニューでコマンドを検索・実行できます。
+- `slh /` または `slh palette`

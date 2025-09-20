@@ -68,3 +68,6 @@ Generate completion script and enable it in your shell profile.
 
 - Bash: `slh completion bash > ~/.slh-completion.bash && echo 'source ~/.slh-completion.bash' >> ~/.bashrc`
 - Zsh:  `slh completion zsh > ~/.slh-completion.zsh && echo 'source ~/.slh-completion.zsh' >> ~/.zshrc`
+### 4. Command Palette
+Open an interactive slash menu to discover and run commands.
+- `slh /` or `slh palette`

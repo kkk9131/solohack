@@ -257,6 +257,160 @@ program
   });
 
 program
+  .command('palette')
+  .alias('/')
+  .description('Open interactive command palette (slash menu).')
+  .action(async () => {
+    // 動的requireで型解決や未インストール環境でもビルドを通す
+    const { createRequire } = await import('node:module');
+    const require = createRequire(import.meta.url);
+    let AutoComplete: any, Input: any, Select: any;
+    try {
+      ({ AutoComplete, Input, Select } = require('enquirer'));
+    } catch {
+      console.error('Interactive palette requires "enquirer". Install with: npm i enquirer');
+      process.exitCode = 1;
+      return;
+    }
+
+    const choices = [
+      { name: 'task:add', message: 'task add  — タスクを追加' },
+      { name: 'task:list', message: 'task list — タスク一覧' },
+      { name: 'task:done', message: 'task done — タスク完了' },
+      { name: 'task:remove', message: 'task remove — タスク削除' },
+      { name: 'timer:start', message: 'timer start — タイマー開始' },
+      { name: 'timer:status', message: 'timer status — タイマー残り' },
+      { name: 'timer:stop', message: 'timer stop — タイマー停止' },
+      { name: 'timer:reset', message: 'timer reset — タイマー再開' },
+      { name: 'timer:extend', message: 'timer extend — タイマー延長' },
+      { name: 'chat:ask', message: 'chat — AIに質問（Gemini）' },
+    ];
+
+    const select = new AutoComplete({
+      name: 'cmd',
+      message: 'コマンドを選択してください (/ で検索)',
+      limit: 10,
+      choices,
+    });
+    const cmd: string = await select.run();
+
+    try {
+      switch (cmd) {
+        case 'task:add': {
+          const title = await new Input({ name: 'title', message: 'タイトル:' }).run();
+          const created = tasks.addTask(title);
+          await saveTasks(tasks.listTasks());
+          console.log(`Added task #${created.id}: ${created.title}`);
+          break;
+        }
+        case 'task:list': {
+          const list = tasks.listTasks();
+          if (list.length === 0) console.log('No tasks yet.');
+          else list.forEach((t) => console.log(`${t.completed ? '✅' : '🕒'} #${t.id} ${t.title}`));
+          break;
+        }
+        case 'task:done': {
+          const idStr = await new Input({ name: 'id', message: 'ID:' }).run();
+          const id = Number.parseInt(idStr, 10);
+          const done = tasks.markDone(id);
+          await saveTasks(tasks.listTasks());
+          console.log(`Completed task #${done.id}.`);
+          break;
+        }
+        case 'task:remove': {
+          const idStr = await new Input({ name: 'id', message: 'ID:' }).run();
+          const id = Number.parseInt(idStr, 10);
+          tasks.removeTask(id);
+          await saveTasks(tasks.listTasks());
+          console.log(`Removed task #${id}.`);
+          break;
+        }
+        case 'timer:start': {
+          const minStr = await new Input({ name: 'minutes', message: '分(整数):', initial: '25' }).run();
+          const minutes = Number.parseInt(minStr, 10) || 25;
+          await saveTimer({ startedAt: Date.now(), durationSeconds: minutes * 60 });
+          console.log(`Started a ${minutes}-minute pomodoro.`);
+          break;
+        }
+        case 'timer:status': {
+          const t = await loadTimer();
+          if (!t) {
+            console.log('No timer running.');
+          } else {
+            const now = Date.now();
+            const elapsed = Math.max(0, Math.floor((now - t.startedAt) / 1000));
+            const remaining = Math.max(0, t.durationSeconds - elapsed);
+            const fmt = (sec: number) => `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`;
+            if (remaining <= 0) console.log('✅ Timer finished.');
+            else {
+              const barWidth = 20;
+              const ratio = Math.min(1, t.durationSeconds === 0 ? 1 : elapsed / t.durationSeconds);
+              const filled = Math.max(0, Math.min(barWidth, Math.round(barWidth * ratio)));
+              const empty = barWidth - filled;
+              const percent = Math.round(ratio * 100);
+              const bar = `${'█'.repeat(filled)}${'-'.repeat(empty)}`;
+              console.log(`⏳ Remaining: ${fmt(remaining)} | [${bar}] ${percent}%`);
+            }
+          }
+          break;
+        }
+        case 'timer:stop': {
+          await saveTimer(undefined);
+          console.log('Timer cleared.');
+          break;
+        }
+        case 'timer:reset': {
+          const t = await loadTimer();
+          if (!t) console.log('No timer to reset.');
+          else {
+            await saveTimer({ startedAt: Date.now(), durationSeconds: t.durationSeconds });
+            console.log('Timer reset.');
+          }
+          break;
+        }
+        case 'timer:extend': {
+          const addStr = await new Input({ name: 'add', message: '延長(分):', initial: '5' }).run();
+          const add = Number.parseInt(addStr, 10);
+          if (!Number.isFinite(add) || add <= 0) console.log('Please provide a positive number of minutes.');
+          else {
+            const t = await loadTimer();
+            if (!t) console.log('No timer to extend.');
+            else {
+              await saveTimer({ startedAt: t.startedAt, durationSeconds: t.durationSeconds + add * 60 });
+              console.log(`Extended by ${add} minute(s).`);
+            }
+          }
+          break;
+        }
+        case 'chat:ask': {
+          const question = await new Input({ name: 'q', message: '質問:' }).run();
+          const mode = await new Select({ name: 'm', message: 'モード:', choices: ['tech', 'coach'], initial: 0 }).run();
+          const apiKey = process.env.SOLOHACK_GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+          if (!apiKey) {
+            console.error('Missing SOLOHACK_GEMINI_API_KEY (or GOOGLE_API_KEY) in environment.');
+          } else {
+            const chatClient = new ChatClient({
+              apiKey,
+              assistantName: process.env.SOLOHACK_ASSISTANT_NAME,
+              mode: mode as 'tech' | 'coach',
+              tone: process.env.SOLOHACK_ASSISTANT_TONE,
+            });
+            await chatClient.askStream(question, async (text) => {
+              await new Promise((r) => setTimeout(r, 15));
+              process.stdout.write(text);
+            });
+            process.stdout.write('\n');
+          }
+          break;
+        }
+      }
+    } catch (err) {
+      console.error((err as Error).message);
+      process.exitCode = 1;
+    }
+  });
+
+program
   .hook('preAction', async () => {
     // 日本語メモ: 起動ごとに storage からタスクを読み込み、TaskManager を初期化。
     const initial = await loadTasks();
