@@ -43,6 +43,26 @@ npm run dev
 - 任意: `web/public/avatars/default/celebrate.png`
 - 表示は `image-rendering: pixelated` でシャープにしています（`globals.css` の `.pixelated`）。
 
+### ソースからの自動リサイズ（推奨）
+1) ソースを配置（例）
+```
+web/public/avatars/default/src/idle_src.png
+web/public/avatars/default/src/talk_src.png
+# 任意: web/public/avatars/default/src/celebrate_src.png
+```
+2) 変換（128x128, 最近傍, 透明背景, 中央配置）
+```
+cd web
+npm install   # 初回のみ（sharp を取得）
+npm run avatars:build
+```
+3) 出力先
+```
+web/public/avatars/default/idle.png
+web/public/avatars/default/talk.png
+# 任意: web/public/avatars/default/celebrate.png
+```
+
 ---
 - 仕様: `docs/WEB_REQUIREMENTS.md`
 - avatar-ui-core 連携方針: `docs/integrations/avatar-ui-core.md`
