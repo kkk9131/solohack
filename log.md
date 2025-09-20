@@ -12,3 +12,5 @@
 - 2025-09-20 08時 GitHub ActionsのCIワークフロー(.github/workflows/ci.yml)を追加し、build/test/lintを自動化。
 - 2025-09-20 08時 CIを堅牢化（npm ci条件分岐、Node 22追加、concurrency、permissions）に更新。
 - 2025-09-20 08時 カバレッジ閾値(85%)を設定し、storage/chat/timerのテストを追加。達成をロードマップに反映。
+- 2025-09-20 08時 ブランチ feat/cli-persistence-ci-docs を作成し、コミットとプッシュを実施。
+- 2025-09-20 08時 ESLint設定をメタパッケージ非依存( parser/plugin 直指定 )に変更し、CI互換性を向上。
