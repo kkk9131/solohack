@@ -13,21 +13,21 @@ AIの相棒が開発の相談に乗ったり、モチベーションを支援し
 ## 機能一覧（CLI版 MVP）
 
 ### 1. タスク管理
-シンプルなコマンドで、ハッカソンのような開発体験を演出します。
-- `solohack task add "新しい機能"`: タスクを追加します。
-- `solohack task list`: タスク一覧を表示します。
-- `solohack task done <id>`: タスクを完了にします。
-- `solohack task remove <id>`: タスクを削除します。
+シンプルなコマンドで、ハッカソンのような開発体験を演出します。短縮エイリアス `slh` でも実行できます。
+- `slh task add "新しい機能"`: タスクを追加します。
+- `slh task list`: タスク一覧を表示します。
+- `slh task done <id>`: タスクを完了にします。
+- `slh task remove <id>`: タスクを削除します。
 
 ### 2. ポモドーロタイマー
 集中力を高めるためのカウントダウンタイマーです。
-- `solohack timer start 25`: 25分のタイマーを開始します。
-- `solohack timer status`: 残り時間を確認します。
-- `solohack timer stop`: タイマーを停止します。
+- `slh timer start 25`: 25分のタイマーを開始します。
+- `slh timer status`: 残り時間を確認します。
+- `slh timer stop`: タイマーを停止します。
 
 ### 3. AIチャット（相棒）
 技術的な相談からモチベーション維持まで、AIの相棒がサポートします。
-- `solohack chat "divを中央寄せするには？"`: 質問を投げかけます。
+- `slh chat "divを中央寄せするには？"`: 質問を投げかけます。
 - **モード切替:**
   - `--mode tech`: 技術的なアドバイスやコード例を返します。
   - `--mode coach`: モチベーションを維持するための励ましの言葉を返します。

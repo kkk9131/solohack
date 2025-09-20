@@ -14,6 +14,10 @@ SoloHack CLI は AI 相棒と進めるゲーミフィケーション開発体験
 - `npm run lint` – eslint と prettier をまとめて実行。
 独自スクリプトは `package.json` の npm scripts に追加し、散在するシェルスクリプトは避けましょう。
 
+バイナリの短縮エイリアス:
+- CLI は `solohack` に加えて `slh` でも起動できます。
+- 既に `npm link` 済みの場合は、新エイリアス作成のため再度 `npm link` を実行してください。
+
 ## コーディング規約と命名（学習向けコメント指針）
 TypeScript は strict モード、インデントはスペース 2、末尾カンマを推奨します。関数・変数は camelCase、クラスは PascalCase、CLI オプションは kebab-case を徹底します。`src/core/` から細かいユーティリティをエクスポートし、CLI 層を薄く保ちます。
 

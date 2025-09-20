@@ -6,7 +6,8 @@
   "type": "module",
   "main": "dist/cli/index.js",
   "bin": {
-    "solohack": "dist/cli/index.js"
+    "solohack": "dist/cli/index.js",
+    "slh": "dist/cli/index.js"
   },
   "scripts": {
     "build": "tsc --project tsconfig.json",
