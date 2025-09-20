@@ -107,29 +107,61 @@ export default function ChatPanel({
   }
 
   type CmdItem = { label: string; cmd: string };
-  const baseSuggestions: CmdItem[] = [
-    { label: 'help — コマンド一覧', cmd: '/help' },
-    { label: 'sound on — タイプ音ON', cmd: '/sound on' },
-    { label: 'sound off — タイプ音OFF', cmd: '/sound off' },
-    { label: 'speed instant — 即時', cmd: '/speed instant' },
-    { label: 'speed fast — 速い', cmd: '/speed fast' },
-    { label: 'speed normal — 普通', cmd: '/speed normal' },
-    { label: 'speed slow — 遅い', cmd: '/speed slow' },
-    { label: 'speed slower — もっと遅い', cmd: '/speed slower' },
-    { label: 'speed <ms> — 任意速度', cmd: '/speed <ms>' },
-  ];
   const suggestions = useMemo<CmdItem[]>(() => {
-    if (!input.startsWith('/')) return [];
-    const q = input.slice(1).toLowerCase();
-    if (!q) return baseSuggestions;
-    return baseSuggestions.filter((s) => s.cmd.slice(1).startsWith(q) || s.label.toLowerCase().includes(q));
-  }, [input]);
+    if (!showCmds) return [];
+    // ルート階層
+    if (input === '/' || input === '') {
+      return [
+        { label: 'sound — タイプ音設定', cmd: '/sound' },
+        { label: 'speed — 表示速度', cmd: '/speed' },
+        { label: 'help — コマンド一覧', cmd: '/help' },
+      ];
+    }
+    // 入力から階層推定
+    if (input.startsWith('/sound') || cmdStage === 'sound') {
+      return [
+        { label: '← back', cmd: '/back' },
+        { label: 'on', cmd: '/sound on' },
+        { label: 'off', cmd: '/sound off' },
+      ];
+    }
+    if (input.startsWith('/speed') || cmdStage === 'speed') {
+      return [
+        { label: '← back', cmd: '/back' },
+        { label: 'instant', cmd: '/speed instant' },
+        { label: 'fast', cmd: '/speed fast' },
+        { label: 'normal', cmd: '/speed normal' },
+        { label: 'slow', cmd: '/speed slow' },
+        { label: 'slower', cmd: '/speed slower' },
+        { label: 'custom…', cmd: '/speed <ms>' },
+      ];
+    }
+    // デフォルトはルート
+    return [
+      { label: 'sound — タイプ音設定', cmd: '/sound' },
+      { label: 'speed — 表示速度', cmd: '/speed' },
+      { label: 'help — コマンド一覧', cmd: '/help' },
+    ];
+  }, [showCmds, input, cmdStage]);
 
   function executeSuggestion(item: CmdItem) {
+    // ルート選択時の分岐
+    if (item.cmd === '/sound') { setCmdStage('sound'); setCmdIndex(0); setInput('/sound '); return; }
+    if (item.cmd === '/speed') { setCmdStage('speed'); setCmdIndex(0); setInput('/speed '); return; }
+    if (item.cmd === '/help') {
+      const res = parseCommand('/help');
+      if (res) setHistory((h) => [...h, { role: 'system', content: res }]);
+      setShowCmds(false); setCmdIndex(0); setInput(''); setCmdStage('root');
+      return;
+    }
+    if (item.cmd === '/back') {
+      setCmdStage('root'); setCmdIndex(0); setInput('/');
+      return;
+    }
+    // サブ選択の実行
     if (item.cmd.includes('<ms>')) {
       const val = prompt('表示速度(ms/文字)を入力してください', String(ssePace));
-      if (!val) return;
-      const ms = Number(val);
+      if (!val) return; const ms = Number(val);
       if (!Number.isFinite(ms) || ms < 0) {
         setHistory((h) => [...h, { role: 'system', content: 'Usage: /speed <ms>' }]);
       } else {
@@ -140,9 +172,7 @@ export default function ChatPanel({
       const res = parseCommand(item.cmd);
       if (res) setHistory((h) => [...h, { role: 'system', content: res }]);
     }
-    setShowCmds(false);
-    setCmdIndex(0);
-    setInput('');
+    setShowCmds(false); setCmdIndex(0); setInput(''); setCmdStage('root');
   }
 
   async function sendMessage(message: string) {
@@ -282,6 +312,7 @@ export default function ChatPanel({
                 if (v.startsWith('/')) {
                   setShowCmds(true);
                   setCmdIndex(0);
+                  if (v === '/') setCmdStage('root');
                 } else {
                   setShowCmds(false);
                 }
@@ -297,9 +328,11 @@ export default function ChatPanel({
                 } else if (e.key === 'Enter') {
                   e.preventDefault();
                   if (suggestions.length) executeSuggestion(suggestions[Math.max(0, Math.min(cmdIndex, suggestions.length - 1))]);
+                } else if (e.key === 'ArrowLeft') {
+                  if (cmdStage !== 'root') { e.preventDefault(); setCmdStage('root'); setCmdIndex(0); setInput('/'); }
                 } else if (e.key === 'Escape') {
                   e.preventDefault();
-                  setShowCmds(false);
+                  setShowCmds(false); setCmdStage('root'); setCmdIndex(0);
                 }
               }}
               disabled={streaming}
