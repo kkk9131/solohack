@@ -25,6 +25,7 @@ A countdown timer to help you focus.
 - `slh timer start 25`: Start a 25-minute timer.
 - `slh timer status`: Check the remaining time.
 - `slh timer stop`: Stop the timer.
+- `slh timer reset`: Reset the timer to the original duration and restart.
 
 ### 3. AI Chat Partner
 Your AI partner for technical and motivational support.

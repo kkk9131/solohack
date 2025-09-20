@@ -133,6 +133,19 @@ timerCmd
     console.log('Timer cleared.');
   });
 
+timerCmd
+  .command('reset')
+  .description('Reset and restart the current timer with its original duration.')
+  .action(async () => {
+    const t = await loadTimer();
+    if (!t) {
+      console.log('No timer to reset.');
+      return;
+    }
+    await saveTimer({ startedAt: Date.now(), durationSeconds: t.durationSeconds });
+    console.log('Timer reset.');
+  });
+
 program
   .command('chat')
   .argument('<question...>', 'Ask the AI partner a question.')
