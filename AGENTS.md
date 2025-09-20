@@ -39,6 +39,13 @@ Store AI credentials in `.env` (Gemini): `SOLOHACK_GEMINI_API_KEY` (or `GOOGLE_A
 Storage providers:
 - Select with `SOLOHACK_STORAGE_PROVIDER`: `json` (default) or `memory`.
 - `json` stores at `storage/solohack.json`; `memory` is in‑process only (good for tests).
+
+Chat defaults (env):
+- `SOLOHACK_DEFAULT_MODE` = `tech` | `coach`
+- `SOLOHACK_ASSISTANT_TONE` = e.g., `polite, concise, friendly`
+- `SOLOHACK_STREAM_DEFAULT` = `stream` | `no-stream`
+- `SOLOHACK_STREAM_DELAY_MS` = per-char delay (ms)
+The command palette (`slh /`) can write these keys to `.env`.
 Never commit secrets; update `.env.example` accordingly.
 
 ## Repo Logs

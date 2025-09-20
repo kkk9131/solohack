@@ -11,6 +11,8 @@
  *   npm run dev -- chat "質問" --mode tech
  */
 import { Command } from 'commander';
+import { promises as fs } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { config as loadEnv } from 'dotenv';
 import { TaskManager } from '../core/taskManager.js';
 import { ChatClient } from '../core/chat.js';
@@ -195,7 +197,7 @@ timerCmd
 program
   .command('chat')
   .argument('<question...>', 'Ask the AI partner a question.')
-  .option('--mode <mode>', 'Chat mode (tech|coach)', 'tech')
+  .option('--mode <mode>', 'Chat mode (tech|coach)')
   .option('--no-stream', 'Disable streaming output')
   .option('--speed <speed>', 'Typewriter speed (instant|fast|normal|slow)', 'slow')
   .option('--delay <ms>', 'Typewriter delay per character in ms (overrides --speed)', (v) => Number.parseInt(v, 10))
@@ -215,14 +217,16 @@ program
     }
 
     try {
+      const envDefaultMode = process.env.SOLOHACK_DEFAULT_MODE === 'coach' ? 'coach' : 'tech';
       const chatClient = new ChatClient({
         apiKey,
         assistantName: process.env.SOLOHACK_ASSISTANT_NAME,
-        mode: options.mode,
+        mode: ((options.mode as 'tech' | 'coach') ?? envDefaultMode),
         tone: options.tone ?? process.env.SOLOHACK_ASSISTANT_TONE,
       });
       const question = questionWords.join(' ');
-      const useStream = options.noStream ? false : true;
+      const envStreamDefault = process.env.SOLOHACK_STREAM_DEFAULT === 'no-stream' ? false : true;
+      const useStream = options.noStream ? false : envStreamDefault;
       const speedMap: Record<string, number> = { instant: 0, fast: 5, normal: 12, slow: 40 };
       const envDelay = process.env.SOLOHACK_STREAM_DELAY_MS ? Number.parseInt(process.env.SOLOHACK_STREAM_DELAY_MS, 10) : undefined;
       const delay = Number.isFinite(options.delay)
@@ -271,6 +275,26 @@ program
       console.error('Interactive palette requires "enquirer". Install with: npm i enquirer');
       process.exitCode = 1;
       return;
+    }
+
+    async function upsertEnvVars(vars: Record<string, string | undefined>) {
+      const envPath = '.env';
+      let lines: string[] = [];
+      if (existsSync(envPath)) {
+        const raw = await fs.readFile(envPath, 'utf8');
+        lines = raw.split(/\r?\n/);
+      }
+      const keys = Object.keys(vars) as (keyof typeof vars)[];
+      for (const key of keys) {
+        const val = vars[key];
+        if (val == null || val === '') continue; // 空はスキップ（削除は対応しない）
+        const idx = lines.findIndex((l) => l.startsWith(`${key}=`));
+        const entry = `${key}=${val}`;
+        if (idx >= 0) lines[idx] = entry; else lines.push(entry);
+      }
+      // 末尾に改行を保証
+      const out = lines.filter((l) => l.trim().length > 0).join('\n') + '\n';
+      await fs.writeFile(envPath, out, 'utf8');
     }
 
     const choices = [
@@ -425,7 +449,14 @@ program
           const current = process.env.SOLOHACK_STORAGE_PROVIDER ?? 'json';
           const provider = await new Select({ name: 'sp', message: `プロバイダー (現在: ${current})`, choices: ['json', 'memory'] }).run();
           process.env.SOLOHACK_STORAGE_PROVIDER = provider as string;
-          console.log(`Storage provider set to: ${provider} (セッションのみ)`);
+          // 永続化の確認
+          const persist = await new Select({ name: 'p', message: 'この設定を .env に保存しますか？', choices: ['保存する', '保存しない'], initial: 0 }).run();
+          if (persist === '保存する') {
+            await upsertEnvVars({ SOLOHACK_STORAGE_PROVIDER: provider as string });
+            console.log('Saved to .env');
+          } else {
+            console.log(`Storage provider set to: ${provider} (セッションのみ)`);
+          }
           break;
         }
         case 'config:chat': {
@@ -442,7 +473,20 @@ program
           } else {
             sessionDelayMs = undefined;
           }
-          console.log('チャット設定を更新しました。');
+          // 永続化の確認
+          const persist = await new Select({ name: 'p', message: 'この設定を .env に保存しますか？', choices: ['保存する', '保存しない'], initial: 0 }).run();
+          if (persist === '保存する') {
+            const toSave: Record<string, string> = {
+              SOLOHACK_DEFAULT_MODE: sessionMode,
+            } as Record<string, string>;
+            if (sessionTone && sessionTone.trim()) toSave.SOLOHACK_ASSISTANT_TONE = sessionTone.trim();
+            if (typeof sessionStream === 'boolean') toSave.SOLOHACK_STREAM_DEFAULT = sessionStream ? 'stream' : 'no-stream';
+            if (typeof sessionDelayMs === 'number') toSave.SOLOHACK_STREAM_DELAY_MS = String(sessionDelayMs);
+            await upsertEnvVars(toSave);
+            console.log('Saved to .env');
+          } else {
+            console.log('チャット設定を更新しました。（セッションのみ）');
+          }
           break;
         }
       }

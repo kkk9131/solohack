@@ -39,6 +39,13 @@ AI 関連の資格情報は `.env` に保存し、Gemini を利用する場合�
 ストレージプロバイダー:
 - `SOLOHACK_STORAGE_PROVIDER` で選択（`json` 既定 / `memory` テスト向け）。
 - `json` は `storage/solohack.json` に保存、`memory` はプロセス内の一時保存。
+
+チャット既定値（環境変数）:
+- `SOLOHACK_DEFAULT_MODE` = `tech` | `coach`
+- `SOLOHACK_ASSISTANT_TONE` = 例: `丁寧・前向き・簡潔`
+- `SOLOHACK_STREAM_DEFAULT` = `stream` | `no-stream`
+- `SOLOHACK_STREAM_DELAY_MS` = 文字ごとの遅延(ms)
+コマンドパレット（`slh /`）から `.env` への保存が可能です。
 秘密情報はコミットせず、変更があれば `.env.example` を更新します。
 
 ## 作業ログ

@@ -35,3 +35,4 @@
 - 2025-09-20 mainをリモート最新へ同期し、新ブランチ feat/storage-memory-provider を作成。
 - 2025-09-20 ストレージにmemoryプロバイダーを追加。ENVでjson/memory切替、テスト追加、ドキュメント追記。
 - 2025-09-20 コマンドパレットに設定メニューを追加（storage切替、chatのmode/tone/stream/delayをGUI的に設定）。ループ化で連続操作に対応。
+- 2025-09-20 パレットから.envへ設定保存（storage, chat mode/tone/stream/delay）。chatコマンドはENV既定を尊重。AGENTSにENV一覧を追記。
