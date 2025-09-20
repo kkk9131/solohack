@@ -21,16 +21,12 @@ export default function Home() {
 
   // 初回マウント時にタイプライター開始
   useEffect(() => {
-    // StrictMode の再マウントやHMRに備え、開始済みをグローバルに記録
-    const key = '__slh_title_typed__';
-    if (typeof window !== 'undefined' && (window as any)[key]) return;
-    if (typeof window !== 'undefined') (window as any)[key] = true;
-
     (async () => {
       await startTitle('SOLO\nHACK');
       await startPrompt('Press Enter to continue');
     })();
     return () => {
+      // StrictMode での初回アンマウント時に前回ループを確実に停止
       cancelTitle();
       cancelPrompt();
     };
