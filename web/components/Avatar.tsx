@@ -42,7 +42,7 @@ export default function Avatar({
       title={`Avatar: ${state}`}
     >
       {/* NOTE: 画像が未配置の場合に備えて背景グラデのプレースホルダ */}
-      <div className="grid place-items-center bg-gradient-to-br from-hud to-bg" style={{ width: size, height: size }}>
+      <div className="grid place-items-center bg-black" style={{ width: size, height: size }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={src}

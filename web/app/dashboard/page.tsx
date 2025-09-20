@@ -25,7 +25,7 @@ export default function DashboardPage() {
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="hud-card p-4 space-y-4">
           <div className="flex items-center gap-3">
-            <Avatar state={avatarState} size={80} />
+            <Avatar state={avatarState} size={112} />
             <div>
               <div className="text-neon font-semibold">AI Partner</div>
               <div className="text-xs text-neon text-opacity-70">Idle/Talk/Celebrate</div>

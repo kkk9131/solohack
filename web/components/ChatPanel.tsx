@@ -123,7 +123,7 @@ export default function ChatPanel({
               )}
             </div>
             <div className="pt-1">
-              <Avatar state={streaming ? 'talk' : 'idle'} size={80} />
+              <Avatar state={streaming ? 'talk' : 'idle'} size={112} />
             </div>
           </div>
           {/* 入力欄 */}
