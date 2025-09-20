@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0b0f14;
+  --hud: #0e1620;
+  --neon: #00d8ff;
+  --glow: rgba(0, 216, 255, 0.6);
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  @apply bg-bg text-white font-mono antialiased;
+}
+
+.neon-text {
+  color: var(--neon);
+  text-shadow: 0 0 8px var(--glow), 0 0 16px var(--glow);
+}
+
+.hud-card {
+  @apply bg-hud bg-opacity-70 rounded-lg border border-neon border-opacity-20 shadow-glow;
+}
+
+/* ピクセル風フォント（Press Start 2P） */
+.font-pixel {
+  font-family: var(--font-pixel), ui-monospace, Menlo, monospace;
+}
+
+/* タイトルのネオン発光を強める */
+.pixel-title {
+  text-shadow:
+    0 0 6px var(--neon),
+    0 0 12px var(--glow),
+    0 0 24px var(--glow),
+    0 0 36px var(--glow);
+}
+
+/* ドット絵をシャープに表示 */
+.pixelated {
+  image-rendering: pixelated;
+}

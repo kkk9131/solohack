@@ -31,11 +31,12 @@ SoloHack はソロ開発をゲーム感覚で継続できる体験を提供す�
 ## フェーズ2: Web 版 プロトタイプ
 - [x] Web 版 要件定義書の追加（docs/WEB_REQUIREMENTS.md）
 - [x] avatar-ui-core の調査と統合方針メモ（docs/integrations/avatar-ui-core.md）
-- [ ] Next.js(App Router) プロジェクト雛形の用意（Tailwind/Framer Motion 初期設定）
-- [ ] テーマトークン定義（黒/ネオン・グロー・HUD）とベースレイアウト
-- [ ] `Avatar` コンポーネント（idle/talk/celebrate、発光演出）
+ - [x] Next.js(App Router) プロジェクト雛形の用意（Tailwind/Framer Motion 初期設定）
+  - [x] web/ 配下に雛形を追加（タイトル/ダッシュボード/設定、Avatar/Timer/Chatの最小実装）
+- [x] テーマトークン定義（黒/ネオン・グロー・HUD）とベースレイアウト
+- [x] `Avatar` コンポーネント（idle/talk/celebrate、発光演出）
 - [ ] `useTypewriter`（SSEトークン追従・音声ON/OFF）
-- [ ] Chat サーバー（OpenAI SSE プロキシ）/ クライアント（右ドロワー）
+- [x] Chat サーバー（Gemini SSE プロキシ）/ クライアント（右ドロワー＋入力欄）
 - [ ] タイマー（カウントダウン＋祝福演出とAvatar連動）
 - [ ] タスク CRUD（Supabase + RLS、HUD進捗）
 - [ ] 設定画面（AI名/口調、テーマ、ストリーム既定、遅延ms）
