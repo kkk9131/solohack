@@ -23,8 +23,8 @@ You can use either `solohack` or the short alias `slh`.
 ### 2. Pomodoro Timer
 A countdown timer to help you focus.
 - `slh timer start 25`: Start a 25-minute timer.
-- `solohack timer status`: Check the remaining time.
-- `solohack timer stop`: Stop the timer.
+- `slh timer status`: Check the remaining time.
+- `slh timer stop`: Stop the timer.
 
 ### 3. AI Chat Partner
 Your AI partner for technical and motivational support.

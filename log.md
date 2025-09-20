@@ -17,3 +17,4 @@
 - 2025-09-20 08時 CIの依存インストールをnpm ci優先+legacy-peer-deps、失敗時npm installへフォールバックに変更（ESLint peer依存対策）。
 - 2025-09-20 08時 mainをリモート最新へ同期し、ローカルのfeatureブランチを削除。
 - 2025-09-20 08時 CLIバイナリの短縮エイリアスslhを追加し、README/AGENTSを更新。
+- 2025-09-20 08時 README(英/日)のコマンド例をslhに統一（残存のsolohack例を置換）。
