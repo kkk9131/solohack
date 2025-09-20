@@ -11,6 +11,8 @@
  *   npm run dev -- chat "質問" --mode tech
  */
 import { Command } from 'commander';
+import { promises as fs } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { config as loadEnv } from 'dotenv';
 import { TaskManager } from '../core/taskManager.js';
 import { ChatClient } from '../core/chat.js';
@@ -195,7 +197,7 @@ timerCmd
 program
   .command('chat')
   .argument('<question...>', 'Ask the AI partner a question.')
-  .option('--mode <mode>', 'Chat mode (tech|coach)', 'tech')
+  .option('--mode <mode>', 'Chat mode (tech|coach)')
   .option('--no-stream', 'Disable streaming output')
   .option('--speed <speed>', 'Typewriter speed (instant|fast|normal|slow)', 'slow')
   .option('--delay <ms>', 'Typewriter delay per character in ms (overrides --speed)', (v) => Number.parseInt(v, 10))
@@ -215,14 +217,16 @@ program
     }
 
     try {
+      const envDefaultMode = process.env.SOLOHACK_DEFAULT_MODE === 'coach' ? 'coach' : 'tech';
       const chatClient = new ChatClient({
         apiKey,
         assistantName: process.env.SOLOHACK_ASSISTANT_NAME,
-        mode: options.mode,
+        mode: ((options.mode as 'tech' | 'coach') ?? envDefaultMode),
         tone: options.tone ?? process.env.SOLOHACK_ASSISTANT_TONE,
       });
       const question = questionWords.join(' ');
-      const useStream = options.noStream ? false : true;
+      const envStreamDefault = process.env.SOLOHACK_STREAM_DEFAULT === 'no-stream' ? false : true;
+      const useStream = options.noStream ? false : envStreamDefault;
       const speedMap: Record<string, number> = { instant: 0, fast: 5, normal: 12, slow: 40 };
       const envDelay = process.env.SOLOHACK_STREAM_DELAY_MS ? Number.parseInt(process.env.SOLOHACK_STREAM_DELAY_MS, 10) : undefined;
       const delay = Number.isFinite(options.delay)
@@ -273,6 +277,26 @@ program
       return;
     }
 
+    async function upsertEnvVars(vars: Record<string, string | undefined>) {
+      const envPath = '.env';
+      let lines: string[] = [];
+      if (existsSync(envPath)) {
+        const raw = await fs.readFile(envPath, 'utf8');
+        lines = raw.split(/\r?\n/);
+      }
+      const keys = Object.keys(vars) as (keyof typeof vars)[];
+      for (const key of keys) {
+        const val = vars[key];
+        if (val == null || val === '') continue; // 空はスキップ（削除は対応しない）
+        const idx = lines.findIndex((l) => l.startsWith(`${key}=`));
+        const entry = `${key}=${val}`;
+        if (idx >= 0) lines[idx] = entry; else lines.push(entry);
+      }
+      // 末尾に改行を保証
+      const out = lines.filter((l) => l.trim().length > 0).join('\n') + '\n';
+      await fs.writeFile(envPath, out, 'utf8');
+    }
+
     const choices = [
       { name: 'task:add', message: 'task add  — タスクを追加' },
       { name: 'task:list', message: 'task list — タスク一覧' },
@@ -284,18 +308,28 @@ program
       { name: 'timer:reset', message: 'timer reset — タイマー再開' },
       { name: 'timer:extend', message: 'timer extend — タイマー延長' },
       { name: 'chat:ask', message: 'chat — AIに質問（Gemini）' },
+      { name: 'config:storage', message: '設定: ストレージプロバイダーを選択 (json/memory)' },
+      { name: 'config:chat', message: '設定: チャットの既定オプションを設定 (mode/tone/speed/delay)' },
+      { name: 'exit', message: '終了' },
     ];
+    // セッション設定（このパレット起動中のみ有効）
+    let sessionMode: 'tech' | 'coach' | undefined;
+    let sessionTone: string | undefined;
+    let sessionStream: boolean | undefined; // true=stream, false=no-stream
+    let sessionDelayMs: number | undefined;
 
-    const select = new AutoComplete({
-      name: 'cmd',
-      message: 'コマンドを選択してください (/ で検索)',
-      limit: 10,
-      choices,
-    });
-    const cmd: string = await select.run();
+    for (;;) {
+      const select = new AutoComplete({
+        name: 'cmd',
+        message: 'コマンドを選択してください (/ で検索)',
+        limit: 12,
+        choices,
+      });
+      const cmd: string = await select.run();
+      if (cmd === 'exit') break;
 
-    try {
-      switch (cmd) {
+      try {
+        switch (cmd) {
         case 'task:add': {
           const title = await new Input({ name: 'title', message: 'タイトル:' }).run();
           const created = tasks.addTask(title);
@@ -384,7 +418,6 @@ program
         }
         case 'chat:ask': {
           const question = await new Input({ name: 'q', message: '質問:' }).run();
-          const mode = await new Select({ name: 'm', message: 'モード:', choices: ['tech', 'coach'], initial: 0 }).run();
           const apiKey = process.env.SOLOHACK_GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
           if (!apiKey) {
             console.error('Missing SOLOHACK_GEMINI_API_KEY (or GOOGLE_API_KEY) in environment.');
@@ -392,21 +425,75 @@ program
             const chatClient = new ChatClient({
               apiKey,
               assistantName: process.env.SOLOHACK_ASSISTANT_NAME,
-              mode: mode as 'tech' | 'coach',
-              tone: process.env.SOLOHACK_ASSISTANT_TONE,
+              mode: (sessionMode ?? 'tech') as 'tech' | 'coach',
+              tone: sessionTone ?? process.env.SOLOHACK_ASSISTANT_TONE,
             });
-            await chatClient.askStream(question, async (text) => {
-              await new Promise((r) => setTimeout(r, 15));
-              process.stdout.write(text);
-            });
-            process.stdout.write('\n');
+            const useStream = sessionStream ?? true;
+            const delay = sessionDelayMs ?? (Number.isFinite(Number(process.env.SOLOHACK_STREAM_DELAY_MS))
+              ? Number(process.env.SOLOHACK_STREAM_DELAY_MS)
+              : 40);
+            if (useStream) {
+              await chatClient.askStream(question, async (text) => {
+                await new Promise((r) => setTimeout(r, delay));
+                process.stdout.write(text);
+              });
+              process.stdout.write('\n');
+            } else {
+              const answer = await chatClient.ask(question);
+              console.log(answer);
+            }
+          }
+          break;
+        }
+        case 'config:storage': {
+          const current = process.env.SOLOHACK_STORAGE_PROVIDER ?? 'json';
+          const provider = await new Select({ name: 'sp', message: `プロバイダー (現在: ${current})`, choices: ['json', 'memory'] }).run();
+          process.env.SOLOHACK_STORAGE_PROVIDER = provider as string;
+          // 永続化の確認
+          const persist = await new Select({ name: 'p', message: 'この設定を .env に保存しますか？', choices: ['保存する', '保存しない'], initial: 0 }).run();
+          if (persist === '保存する') {
+            await upsertEnvVars({ SOLOHACK_STORAGE_PROVIDER: provider as string });
+            console.log('Saved to .env');
+          } else {
+            console.log(`Storage provider set to: ${provider} (セッションのみ)`);
+          }
+          break;
+        }
+        case 'config:chat': {
+          sessionMode = (await new Select({ name: 'mode', message: 'モード', choices: ['tech', 'coach'], initial: sessionMode === 'coach' ? 1 : 0 }).run()) as 'tech' | 'coach';
+          sessionTone = await new Input({ name: 'tone', message: 'トーン（例: 丁寧・前向き・簡潔 / 妹のような感じ）', initial: sessionTone ?? process.env.SOLOHACK_ASSISTANT_TONE ?? '' }).run();
+          const streamChoice = await new Select({ name: 'stream', message: '出力方式', choices: ['stream (タイプライター)', 'no-stream (一括)'], initial: sessionStream === false ? 1 : 0 }).run();
+          sessionStream = streamChoice.startsWith('stream');
+          if (sessionStream) {
+            const speedChoice = await new Select({ name: 'speed', message: '速度', choices: ['instant', 'fast', 'normal', 'slow'], initial: 3 }).run();
+            const speedMap: Record<string, number> = { instant: 0, fast: 5, normal: 12, slow: 40 };
+            sessionDelayMs = speedMap[speedChoice as string] ?? 40;
+            const override = await new Input({ name: 'delay', message: `遅延(ms/文字) 任意（空で既定: ${sessionDelayMs}）`, initial: '' }).run();
+            if (override && !Number.isNaN(Number(override))) sessionDelayMs = Number(override);
+          } else {
+            sessionDelayMs = undefined;
+          }
+          // 永続化の確認
+          const persist = await new Select({ name: 'p', message: 'この設定を .env に保存しますか？', choices: ['保存する', '保存しない'], initial: 0 }).run();
+          if (persist === '保存する') {
+            const toSave: Record<string, string> = {
+              SOLOHACK_DEFAULT_MODE: sessionMode,
+            } as Record<string, string>;
+            if (sessionTone && sessionTone.trim()) toSave.SOLOHACK_ASSISTANT_TONE = sessionTone.trim();
+            if (typeof sessionStream === 'boolean') toSave.SOLOHACK_STREAM_DEFAULT = sessionStream ? 'stream' : 'no-stream';
+            if (typeof sessionDelayMs === 'number') toSave.SOLOHACK_STREAM_DELAY_MS = String(sessionDelayMs);
+            await upsertEnvVars(toSave);
+            console.log('Saved to .env');
+          } else {
+            console.log('チャット設定を更新しました。（セッションのみ）');
           }
           break;
         }
       }
-    } catch (err) {
-      console.error((err as Error).message);
-      process.exitCode = 1;
+      } catch (err) {
+        console.error((err as Error).message);
+        process.exitCode = 1;
+      }
     }
   });
 

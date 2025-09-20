@@ -1,6 +1,7 @@
 import type { Task } from './taskManager.js';
 import type { RepoData, StorageProvider, TimerPersisted } from './storage/provider.js';
 import { JsonStorageProvider } from './storage/jsonProvider.js';
+import { MemoryStorageProvider } from './storage/memoryProvider.js';
 
 export type { RepoData, TimerPersisted } from './storage/provider.js';
 
@@ -8,6 +9,8 @@ export type { RepoData, TimerPersisted } from './storage/provider.js';
 function getProvider(): StorageProvider {
   const provider = process.env.SOLOHACK_STORAGE_PROVIDER ?? 'json';
   switch (provider) {
+    case 'memory':
+      return new MemoryStorageProvider();
     case 'json':
     default:
       return new JsonStorageProvider();
