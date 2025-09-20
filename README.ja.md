@@ -61,3 +61,9 @@ SoloHackプロジェクトは、このCLI版から始まり、将来的には以
 
 - ローカルでのリンク: `npm run link`（`slh` と `solohack` の両方が使えるようになります）。既にリンク済みの場合も、新エイリアス反映のため再実行してください。
 - 解除（任意）: `npm unlink -g solohack-cli`（必要に応じて、リポジトリ内で `npm unlink`）
+## シェル補完
+
+補完スクリプトを出力して、シェルの設定に取り込みます。
+
+- Bash: `slh completion bash > ~/.slh-completion.bash && echo 'source ~/.slh-completion.bash' >> ~/.bashrc`
+- Zsh:  `slh completion zsh > ~/.slh-completion.zsh && echo 'source ~/.slh-completion.zsh' >> ~/.zshrc`

@@ -62,3 +62,9 @@ The ultimate goal is to create a next-generation IDE that handles everything fro
 
 - Global link for local testing: `npm run link` (creates `slh` and `solohack` commands). If you had linked before, re-run to add the new alias.
 - Unlink (optional): `npm unlink -g solohack-cli` (and inside the repo: `npm unlink`)
+## Shell Completion
+
+Generate completion script and enable it in your shell profile.
+
+- Bash: `slh completion bash > ~/.slh-completion.bash && echo 'source ~/.slh-completion.bash' >> ~/.bashrc`
+- Zsh:  `slh completion zsh > ~/.slh-completion.zsh && echo 'source ~/.slh-completion.zsh' >> ~/.zshrc`
