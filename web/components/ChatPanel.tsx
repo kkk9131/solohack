@@ -78,7 +78,6 @@ export default function ChatPanel({
     };
   }, [open, cancel]);
 
-<<<<<<< HEAD
   function parseCommand(raw: string): string | null {
     const parts = raw.trim().slice(1).split(/\s+/);
     const cmd = (parts[0] || '').toLowerCase();
@@ -293,11 +292,7 @@ export default function ChatPanel({
           <div ref={bottomRef} />
           {/* 入力欄 */}
           <form
-<<<<<<< HEAD
             className="mt-4 flex items-center gap-2 relative"
-=======
-            className="mt-4 flex items-center gap-2"
->>>>>>> origin/main
             onSubmit={(e) => {
               e.preventDefault();
               const msg = input.trim();
@@ -311,7 +306,6 @@ export default function ChatPanel({
               className="flex-1 bg-bg text-white/90 placeholder:text-white/40 border border-neon border-opacity-20 rounded-md px-3 py-2 focus:outline-none focus:border-opacity-40"
               placeholder="Type a message and press Enter"
               value={input}
-<<<<<<< HEAD
               onChange={(e) => {
                 const v = e.target.value;
                 setInput(v);
@@ -341,9 +335,6 @@ export default function ChatPanel({
                   setShowCmds(false); setCmdStage('root'); setCmdIndex(0);
                 }
               }}
-=======
-              onChange={(e) => setInput(e.target.value)}
->>>>>>> origin/main
               disabled={streaming}
             />
             <button
@@ -353,8 +344,6 @@ export default function ChatPanel({
             >
               Send
             </button>
-<<<<<<< HEAD
-
             {/* Slash commands dropdown */}
             {showCmds && suggestions.length > 0 && (
               <div ref={cmdRef} className="absolute left-0 right-0 -bottom-2 translate-y-full bg-hud bg-opacity-95 border border-neon border-opacity-20 rounded-md shadow-glow z-50">
@@ -371,8 +360,6 @@ export default function ChatPanel({
                 ))}
               </div>
             )}
-=======
->>>>>>> origin/main
           </form>
         </motion.aside>
       )}
