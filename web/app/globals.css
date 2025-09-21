@@ -35,7 +35,6 @@ body {
 .font-dot {
   font-family: var(--font-dot), var(--font-pixel), ui-monospace, Menlo, monospace;
 }
-
 /* タイトルのネオン発光を強める */
 .pixel-title {
   text-shadow:

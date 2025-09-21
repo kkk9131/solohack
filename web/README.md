@@ -33,7 +33,6 @@ npm run dev
 - `/help` … コマンド一覧を表示
 - `/sound on|off` … タイプライター音のON/OFF（再読み込み後も保持）
 - `/speed <instant|fast|normal|slow|slower|ms>` … 表示速度（SSEとフォールバックに適用、保持）
-
 ## 技術スタック
 - Next.js (App Router)
 - Tailwind CSS（テーマトークン: `--bg`, `--hud`, `--neon`, `--glow`）

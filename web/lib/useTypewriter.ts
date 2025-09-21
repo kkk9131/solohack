@@ -1,6 +1,5 @@
 "use client";
 import { useCallback, useRef, useState } from 'react';
-
 type SoundOptions = {
   enabled?: boolean;
   freq?: number; // Hz
