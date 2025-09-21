@@ -17,11 +17,22 @@ npm run dev
     - `NEXT_PUBLIC_SOLOHACK_STREAM_DELAY_MS=60`（フォールバック時）
     - `NEXT_PUBLIC_SOLOHACK_TITLE_DELAY_MS=60`（タイトル画面。未設定時は上記を流用）
     - `NEXT_PUBLIC_SOLOHACK_SSE_PACE_MS=0`（SSEトークンの表示間隔ms。0=即時。例: 30〜60でゆっくり）
+  - タイプ音（ON/OFFと音色）
+    - `NEXT_PUBLIC_SOLOHACK_SOUND_ENABLED=false`
+    - `NEXT_PUBLIC_SOLOHACK_SOUND_FREQ=1200`
+    - `NEXT_PUBLIC_SOLOHACK_SOUND_VOLUME=0.05`
+    - `NEXT_PUBLIC_SOLOHACK_SOUND_END_VOLUME=0.01`
+    - `NEXT_PUBLIC_SOLOHACK_SOUND_DURATION_MS=20`
+    - `NEXT_PUBLIC_SOLOHACK_SOUND_STEP=2`（何文字に1回鳴らすか。1で毎文字）
 - ルート:
   - `/` タイトル（Enter またはボタンで `/dashboard`）
   - `/dashboard` HUD（Avatar/Timer/Progress + Chat ドロワー）
   - `/settings` 設定プレースホルダ
 
+## Slash Commands（チャット入力欄）
+- `/help` … コマンド一覧を表示
+- `/sound on|off` … タイプライター音のON/OFF（再読み込み後も保持）
+- `/speed <instant|fast|normal|slow|slower|ms>` … 表示速度（SSEとフォールバックに適用、保持）
 ## 技術スタック
 - Next.js (App Router)
 - Tailwind CSS（テーマトークン: `--bg`, `--hud`, `--neon`, `--glow`）

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import { Press_Start_2P } from 'next/font/google';
+import { Press_Start_2P, DotGothic16 } from 'next/font/google';
 
 export const metadata: Metadata = {
   title: 'SoloHack Web',
@@ -8,11 +8,12 @@ export const metadata: Metadata = {
 };
 
 const pixel = Press_Start_2P({ subsets: ['latin'], weight: '400', display: 'swap', variable: '--font-pixel' });
+const dot = DotGothic16({ subsets: ['latin'], weight: '400', display: 'swap', variable: '--font-dot' });
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   // 日本語メモ: ダークテーマ前提。Tailwindのクラスで全体トーンを統一。
   return (
-    <html lang="ja" className={`dark ${pixel.variable}`}>
+    <html lang="ja" className={`dark ${pixel.variable} ${dot.variable}`}>
       <body className="min-h-dvh bg-bg text-white">{children}</body>
     </html>
   );
