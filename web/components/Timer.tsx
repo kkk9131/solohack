@@ -36,6 +36,20 @@ export default function Timer({
   });
 
   const intervalRef = useRef<number | null>(null);
+  const [presets, setPresets] = useState<number[]>(() => {
+    try {
+      const raw = localStorage.getItem('slh_timer_presets_v1');
+      if (raw) {
+        const arr = JSON.parse(raw) as number[];
+        if (Array.isArray(arr) && arr.every((n) => typeof n === 'number' && n > 0)) {
+          return Array.from(new Set(arr.map((n) => Math.round(n))));
+        }
+      }
+    } catch {}
+    return [25, 50, 5];
+  });
+  const [customStart, setCustomStart] = useState('');
+  const [newPreset, setNewPreset] = useState('');
 
   // 永続化
   useEffect(() => {
@@ -43,6 +57,12 @@ export default function Timer({
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch {}
   }, [state]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('slh_timer_presets_v1', JSON.stringify(presets));
+    } catch {}
+  }, [presets]);
 
   const startWith = useCallback((sec: number) => {
     setState({ duration: sec, remain: sec, running: true });
@@ -55,6 +75,21 @@ export default function Timer({
   const resume = useCallback(() => {
     setState((s) => (s.remain > 0 ? { ...s, running: true } : s));
   }, []);
+
+  function parseToSeconds(input: string): number | null {
+    const v = input.trim();
+    if (!v) return null;
+    // mm:ss 形式
+    if (/^\d{1,3}:\d{2}$/.test(v)) {
+      const [mm, ss] = v.split(':').map((n) => Number(n));
+      if (Number.isFinite(mm) && Number.isFinite(ss)) return mm * 60 + ss;
+      return null;
+    }
+    // 分（数字）
+    const m = Number(v);
+    if (Number.isFinite(m) && m > 0) return Math.round(m) * 60;
+    return null;
+  }
 
   const reset = useCallback(() => {
     setState((s) => ({ ...s, remain: s.duration, running: false }));
@@ -102,24 +137,39 @@ export default function Timer({
     <div className="space-y-4">
       {/* プリセット */}
       <div className="flex flex-wrap items-center gap-2 text-xs">
-        <button
-          className="px-2 py-1 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10"
-          onClick={() => startWith(25 * 60)}
+        {presets.map((m) => (
+          <button
+            key={m}
+            className="px-2 py-1 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10"
+            onClick={() => startWith(m * 60)}
+            title={`${m} minutes`}
+          >
+            {m}m
+          </button>
+        ))}
+        {/* 追加 */}
+        <form
+          className="flex items-center gap-1"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const sec = parseToSeconds(newPreset);
+            if (sec && sec > 0) {
+              const m = Math.round(sec / 60);
+              setPresets((p) => Array.from(new Set([...p, m])).sort((a, b) => a - b));
+              setNewPreset('');
+            }
+          }}
         >
-          25m
-        </button>
-        <button
-          className="px-2 py-1 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10"
-          onClick={() => startWith(50 * 60)}
-        >
-          50m
-        </button>
-        <button
-          className="px-2 py-1 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10"
-          onClick={() => startWith(5 * 60)}
-        >
-          5m
-        </button>
+          <input
+            value={newPreset}
+            onChange={(e) => setNewPreset(e.target.value)}
+            placeholder="Add m or mm:ss"
+            className="w-28 px-2 py-1 bg-bg text-white/80 border border-neon border-opacity-30 rounded-md placeholder:text-white/30 focus:outline-none"
+          />
+          <button className="px-2 py-1 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10" type="submit">
+            Add
+          </button>
+        </form>
       </div>
 
       {/* 時間表示 */}
@@ -135,6 +185,29 @@ export default function Timer({
 
       {/* コントロール */}
       <div className="flex items-center gap-2 text-sm">
+        {/* 手動開始 */}
+        <form
+          className="flex items-center gap-1"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const sec = parseToSeconds(customStart);
+            if (sec && sec > 0) {
+              startWith(sec);
+              setCustomStart('');
+            }
+          }}
+        >
+          <input
+            value={customStart}
+            onChange={(e) => setCustomStart(e.target.value)}
+            placeholder="Start m or mm:ss"
+            className="w-36 px-2 py-1 bg-bg text-white/80 border border-neon border-opacity-30 rounded-md placeholder:text-white/30 focus:outline-none"
+          />
+          <button className="px-3 py-1 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10" type="submit">
+            Start
+          </button>
+        </form>
+
         {state.running ? (
           <button
             className="px-3 py-1 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10"
