@@ -32,14 +32,16 @@ export function getRepoRoot() {
 
 export function createSession({ cwd, cols = 80, rows = 24 }: { cwd?: string; cols?: number; rows?: number }) {
   const repo = getRepoRoot();
-  const shell = process.env.SHELL || (process.platform === 'win32' ? 'powershell.exe' : '/bin/bash');
+  const defaultShell = process.platform === 'win32' ? 'powershell.exe' : (process.platform === 'darwin' ? '/bin/zsh' : '/bin/bash');
+  const shell = process.env.SHELL || defaultShell;
   const id = genId();
+  const env = { ...process.env, TERM: process.env.TERM || 'xterm-256color' } as any;
   const pty = spawn(shell, [], {
     name: 'xterm-color',
     cols,
     rows,
     cwd: cwd ? path.resolve(repo, cwd) : repo,
-    env: process.env as any,
+    env,
   });
   const sess: Session = { id, pty, createdAt: Date.now(), cwd: cwd ? path.resolve(repo, cwd) : repo };
   sessions.set(id, sess);
