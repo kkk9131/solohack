@@ -18,6 +18,10 @@ export default function ExplorerPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [preview, setPreview] = useState<{ path: string; content: string; truncated: boolean } | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editContent, setEditContent] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveNote, setSaveNote] = useState('');
 
   // Local (browser-only) explorer
   const [localRoot, setLocalRoot] = useState<FileSystemDirectoryHandle | null>(null);
@@ -26,6 +30,10 @@ export default function ExplorerPage() {
   const [localLoading, setLocalLoading] = useState(false);
   const [localError, setLocalError] = useState('');
   const [localPreview, setLocalPreview] = useState<{ path: string; content: string; truncated: boolean } | null>(null);
+  const [localEditing, setLocalEditing] = useState(false);
+  const [localEditContent, setLocalEditContent] = useState('');
+  const [localSaveNote, setLocalSaveNote] = useState('');
+  const [localFileHandle, setLocalFileHandle] = useState<FileSystemFileHandle | null>(null);
 
   async function load(dir: string) {
     setLoading(true);
@@ -42,6 +50,28 @@ export default function ExplorerPage() {
       setError(e?.message ?? 'failed');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function saveEdit() {
+    if (!preview) return;
+    setSaving(true);
+    setSaveNote('');
+    try {
+      const res = await fetch('/api/fs/write', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ p: preview.path, content: editContent }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setSaveNote('Saved');
+      setPreview({ ...preview, content: editContent });
+      setEditing(false);
+      setTimeout(() => setSaveNote(''), 1500);
+    } catch (e: any) {
+      setSaveNote(e?.message ?? 'Failed to save');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -62,6 +92,8 @@ export default function ExplorerPage() {
 
   async function openPreview(rel: string) {
     setPreview(null);
+    setEditing(false);
+    setSaveNote('');
     try {
       const p = cwd === '.' ? rel : `${cwd}/${rel}`;
       const res = await fetch(`/api/fs/read?p=${encodeURIComponent(p)}`);
@@ -145,6 +177,7 @@ export default function ExplorerPage() {
     if (entry.kind !== 'file') return;
     try {
       const fh = entry.handle as FileSystemFileHandle;
+      setLocalFileHandle(fh);
       const file = await fh.getFile();
       const text = await file.text();
       const MAX = 100 * 1024;
@@ -152,8 +185,25 @@ export default function ExplorerPage() {
       const truncated = text.length > MAX;
       const rel = localStack.length > 1 ? localStack.slice(1).map((h: any) => h.name).concat(entry.name).join('/') : entry.name;
       setLocalPreview({ path: `local:/${rel}`, content, truncated });
+      setLocalEditing(false);
     } catch (e: any) {
       setLocalPreview({ path: entry.name, content: `Error: ${e?.message ?? 'unknown'}`, truncated: false });
+    }
+  }
+
+  async function saveLocalEdit() {
+    try {
+      setLocalSaveNote('');
+      if (!localPreview || !localFileHandle) return;
+      const writable = await (localFileHandle as any).createWritable();
+      await writable.write(localEditContent);
+      await writable.close();
+      setLocalPreview({ ...localPreview, content: localEditContent });
+      setLocalEditing(false);
+      setLocalSaveNote('Saved');
+      setTimeout(() => setLocalSaveNote(''), 1500);
+    } catch (e: any) {
+      setLocalSaveNote(e?.message ?? 'Failed to save');
     }
   }
 
@@ -232,8 +282,32 @@ export default function ExplorerPage() {
           {preview ? (
             <div className="space-y-2">
               <div className="text-xs text-neon text-opacity-70 break-all">{preview.path}</div>
-              <pre className="text-xs whitespace-pre-wrap break-words max-h-[60vh] overflow-auto bg-bg/60 p-3 rounded-md border border-neon border-opacity-10">{preview.content}</pre>
-              {preview.truncated && <div className="text-xs text-white/50">(truncated)</div>}
+              {!editing ? (
+                <>
+                  <pre className="text-xs whitespace-pre-wrap break-words max-h-[60vh] overflow-auto bg-bg/60 p-3 rounded-md border border-neon border-opacity-10">{preview.content}</pre>
+                  {preview.truncated && <div className="text-xs text-white/50">(truncated — editing disabled)</div>}
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      onClick={() => { setEditing(true); setEditContent(preview.content); }}
+                      className="px-2 py-1 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10 text-xs disabled:opacity-40"
+                      disabled={preview.truncated}
+                    >Edit</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <textarea
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    className="w-full text-xs min-h-[40vh] max-h-[60vh] bg-bg/60 p-3 rounded-md border border-neon border-opacity-10"
+                  />
+                  <div className="flex items-center gap-2">
+                    <button onClick={saveEdit} disabled={saving} className="px-2 py-1 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10 text-xs disabled:opacity-40">Save</button>
+                    <button onClick={() => setEditing(false)} className="px-2 py-1 border border-neon border-opacity-20 rounded-md text-white/80 hover:bg-neon hover:bg-opacity-10 text-xs">Cancel</button>
+                    <span className="text-xs text-neon text-opacity-70">{saveNote}</span>
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             <div className="text-white/50 text-sm">Select a file to preview</div>
@@ -302,8 +376,32 @@ export default function ExplorerPage() {
           {localPreview ? (
             <div className="space-y-2">
               <div className="text-xs text-neon text-opacity-70 break-all">{localPreview.path}</div>
-              <pre className="text-xs whitespace-pre-wrap break-words max-h-[60vh] overflow-auto bg-bg/60 p-3 rounded-md border border-neon border-opacity-10">{localPreview.content}</pre>
-              {localPreview.truncated && <div className="text-xs text-white/50">(truncated)</div>}
+              {!localEditing ? (
+                <>
+                  <pre className="text-xs whitespace-pre-wrap break-words max-h-[60vh] overflow-auto bg-bg/60 p-3 rounded-md border border-neon border-opacity-10">{localPreview.content}</pre>
+                  {localPreview.truncated && <div className="text-xs text-white/50">(truncated — editing will overwrite file)</div>}
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      onClick={() => { setLocalEditing(true); setLocalEditContent(localPreview.content); }}
+                      className="px-2 py-1 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10 text-xs disabled:opacity-40"
+                      disabled={!localFileHandle}
+                    >Edit</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <textarea
+                    value={localEditContent}
+                    onChange={(e) => setLocalEditContent(e.target.value)}
+                    className="w-full text-xs min-h-[40vh] max-h-[60vh] bg-bg/60 p-3 rounded-md border border-neon border-opacity-10"
+                  />
+                  <div className="flex items-center gap-2">
+                    <button onClick={saveLocalEdit} className="px-2 py-1 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10 text-xs">Save</button>
+                    <button onClick={() => setLocalEditing(false)} className="px-2 py-1 border border-neon border-opacity-20 rounded-md text-white/80 hover:bg-neon hover:bg-opacity-10 text-xs">Cancel</button>
+                    <span className="text-xs text-neon text-opacity-70">{localSaveNote}</span>
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             <div className="text-white/50 text-sm">Select a file to preview</div>
