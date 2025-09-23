@@ -85,11 +85,16 @@ export default function Timer({
       if (Number.isFinite(mm) && Number.isFinite(ss)) return mm * 60 + ss;
       return null;
     }
-    // 分（数字）
-    const m = Number(v);
+    // 分（数字 or 末尾に m / min / 分）
+    const mMatch = v.match(/^(\d{1,4})(?:\s*(m|min|分))?$/i);
+    const m = mMatch ? Number(mMatch[1]) : Number.NaN;
     if (Number.isFinite(m) && m > 0) return Math.round(m) * 60;
     return null;
   }
+
+  const removePreset = useCallback((target: number) => {
+    setPresets((p) => p.filter((x) => x !== target));
+  }, []);
 
   const reset = useCallback(() => {
     setState((s) => ({ ...s, remain: s.duration, running: false }));
@@ -138,14 +143,25 @@ export default function Timer({
       {/* プリセット */}
       <div className="flex flex-wrap items-center gap-2 text-xs">
         {presets.map((m) => (
-          <button
-            key={m}
-            className="px-2 py-1 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10"
-            onClick={() => startWith(m * 60)}
-            title={`${m} minutes`}
-          >
-            {m}m
-          </button>
+          <span key={m} className="inline-flex items-center">
+            <button
+              className="px-2 py-1 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10"
+              onClick={() => startWith(m * 60)}
+              title={`${m} minutes`}
+              type="button"
+            >
+              {m}m
+            </button>
+            <button
+              type="button"
+              aria-label={`remove ${m}m`}
+              className="ml-1 px-1 pb-0.5 border border-neon border-opacity-20 rounded text-neon hover:bg-neon hover:bg-opacity-10"
+              onClick={() => removePreset(m)}
+              title="remove"
+            >
+              ×
+            </button>
+          </span>
         ))}
         {/* 追加 */}
         <form
