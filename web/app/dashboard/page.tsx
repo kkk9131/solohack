@@ -25,6 +25,12 @@ export default function DashboardPage() {
         <h2 className="font-pixel pixel-title text-neon text-2xl">Dashboard</h2>
         <div className="flex items-center gap-2">
           <Link
+            href="/studio"
+            className="px-4 py-2 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10 transition"
+          >
+            Studio
+          </Link>
+          <Link
             href="/explorer"
             className="px-4 py-2 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10 transition"
           >
