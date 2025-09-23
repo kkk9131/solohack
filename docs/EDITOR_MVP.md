@@ -1,0 +1,118 @@
+# エディタ中心のAIコーディングMVP（初心者向け）
+
+目的: 個人開発初心者が、実際のターミナル操作や複雑なIDE設定なしに、ゲーム感覚で「編集→実行→学び→共有（PR/デプロイ）」まで一貫できる体験を提供する。
+
+## ターゲット/原則
+- ターゲット: 個人開発初心者（Next.js + TypeScript 前提の学習・制作）
+- 原則:
+  - 低負荷（選択式・確認式・ワンクリック中心）
+  - 学びと成果の両立（短いサイクルで達成演出＋“今だけ”解説）
+  - 失敗を前提にした回復（ログ要約→修正パッチ→再実行）
+
+## 体験デザイン
+- レイアウト:
+  - 中央: Monaco エディタ（タブ/未保存/差分）
+  - 左: クエスト/タスク/タイマー（進捗・報酬演出）
+  - 右: AIコーチ（チャット/提案/パッチ）
+  - 下: 実行ログ（Test/TypeCheck/Build/Deploy）
+- コマンドパレット: `/commit`, `/pr`, `/deploy`, `/test`, `/fix`, `/plan` など
+- インラインAI: 選択範囲→「改善/解説/テスト生成/リファクタ」→Diff表示→適用
+
+## 機能リスト（段階導入）
+1. エディタ/Explorer統合
+   - Monaco 埋め込み、タブ、未保存警告、差分ビュー
+   - Explorer と双方向（開く/保存/新規/リネーム/削除）
+   - ブラウザのみ（File System Access API）とサーバー配下（開発時のみ書込み）に両対応
+2. クエスト駆動UI
+   - 5〜15分の小目標カード（手順・進捗バー）
+   - “今だけ”解説トグル（なぜ/落とし穴/代替案）
+   - 完了時の演出（発光/サウンド/XP）と日次スナップ
+3. ワンクリック実行
+   - Test/TypeCheck/Build/Deploy のボタン化（まずはモック→段階的に実行 API）
+   - 失敗時のログ要約＋修正パッチ提案
+4. Git/PR
+   - status/branch/commit（AIコミット文候補）
+   - Diff要約とPR作成（GitHub API、ラベル/テンプレ）
+5. デプロイ
+   - Vercel などのCLI/PRベース連携（Preflight→確認→実行→プレビューURL）
+6. 学び/復習
+   - ミニクイズ/リキャップ（2〜3択）で理解確認→XP
+
+## 技術方針
+- フロント: Next.js(App Router) + Monaco + Tailwind + Framer Motion
+- ファイルアクセス: 
+  - Local: File System Access API（Chromium）
+  - Workspace: 開発環境限定 API（fs read/write, git コマンド実行）
+- AI: Gemini 統合（チャット/パッチ生成/要約）、設定画面で口調/速度/ストリーム既定
+- GitHub連携: Management API（PAT/OAuth）、PR作成・テンプレ・ラベル
+- デプロイ: Vercel CLI or GitHub PRベース（推奨はPRベースから）
+
+## セキュリティ/安全
+- 本番では fs 書込み/コマンド実行は既定で無効（`SOLOHACK_FS_WRITE_ENABLED`）
+- パッチ適用は必ず Diff 表示→確認→適用の三段階
+- 失敗時は Undo/Redo とセーブポイント（スナップショット）
+- 秘密情報は localStorage 開発用 or サーバー側管理（本番）
+
+## MVPスコープ（v0.1）
+- [ ] Monaco 中央配置、Explorer連携（開く/保存/未保存警告）
+- [ ] クエストUI 骨組み（カード/進捗）
+- [ ] ワンクリック Test/TypeCheck/Build（モック）
+- [ ] インラインAI: 選択範囲→解説/改善→パッチ生成（ダイアログで Diff 表示）
+
+## v0.2
+- [ ] Git最小統合（status/branch/commit、AIコミット文）
+- [ ] PR作成（本文自動生成/チェックリスト/ラベル）
+- [ ] 失敗ログ→パッチ提案→再実行のループ
+
+## v0.3
+- [ ] デプロイ（Preflight→実行→プレビューURL）
+- [ ] アチーブメント（連続日数/テスト合格/コミット）
+- [ ] クエスト教材の追加（Next.js入門連作）
+
+## 非対象（MVPでは実施しない）
+- 完全なLSP統合（段階的に導入）
+- 自動コミット/自動デプロイ（必ずユーザー確認を挟む）
+
+## リスクと対策
+- ブラウザ互換（File System Access API）: 非対応環境はサーバー配下 or ダウンロードで代替
+- セキュリティ: 本番での書込み/API実行は既定で無効、認証/権限プリセットを導入
+- AI品質揺らぎ: パッチは必ず Diff レビューを通す、テスト自動化を推奨
+
+---
+
+# モバイル/リモート開発（Mac + iPhone 一貫体験）
+
+目的: Mac の計算資源/FS を活用しつつ、iPhone から同じ UI で「編集→実行→確認→デプロイ」まで行える状態を用意する。
+
+## アーキテクチャ指針
+- 二本立てバックエンド
+  1) ローカル駆動: Mac 上の SoloHack Daemon（Node/WS/REST）に接続（LAN/トンネル）
+  2) クラウド駆動: Codespaces 等のクラウド環境に接続先を切替
+- フロント
+  - Web/PWA（iOSホーム追加）。中央エディタは Desktop=Monaco / Mobile=CodeMirror6（抽象化レイヤーで共通API）
+  - 役割分担: 端末は操作/可視化、実行はバックエンドで実施（ログ/進捗をSSE/WSで配信）
+
+## SoloHack Daemon（ローカル橋渡し）
+- 機能: fs(list/read/write/diff), git(status/branch/commit/push), run(test/typecheck/build/dev), logs(stream)
+- ペアリング: QR（短命トークン）→トークン保存/失効。許可オリジン＋IP制限
+- 到達性: Cloudflare Tunnel 推奨（TLS/WAF/無料枠）。スリープ抑止（macOS: caffeinate）
+
+## PWA/モバイル最適化
+- PWA: manifest/Service Worker、オフラインUI（編集キャッシュ/後同期）
+- iOS UI: 大きめタップ、最小タップ数、片手操作、差分前提の編集（編集→Diff→適用）
+
+## 確認方法（実装後の検証フロー）
+- ライブ開発プレビュー（推奨）
+  - Macで dev server + tunnel を起動 → iPhoneの「Start Preview」でURL/QR表示 → 実機確認
+- PRプレビュー（クラウド）
+  - Push→CI→Vercel/Netlify の Preview URL を iPhone で開く
+- CIチェック
+  - iPhoneから「Run Tests/TypeCheck/Build」→バックエンド実行 → ログをUIで確認 → AIパッチ提案→適用→再実行
+
+## セキュリティ方針
+- 本番は書込み/コマンド実行を既定で無効（フラグで段階解放）。危険操作は Diff 確認必須
+- 秘密情報は localStorage は開発用途に限定。運用はサーバー側秘密管理/パスキー認証
+
+## ロードマップへの反映（抜粋）
+- PWA化、モバイルエディタ最適化、Daemon最小API、トンネル、接続先スイッチ（Mac/クラウド）、Runパネル/ログ、プレビューURL/QR
+

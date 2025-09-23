@@ -36,6 +36,7 @@ SoloHack はソロ開発をゲーム感覚で継続できる体験を提供す�
 - [x] テーマトークン定義（黒/ネオン・グロー・HUD）とベースレイアウト
 - [x] `Avatar` コンポーネント（idle/talk/celebrate、発光演出）
 - [ ] `useTypewriter`（音声ON/OFF、SSE統合ユーティリティ化）
+ - [x] `useTypewriter`（音声ON/OFF、SSE統合ユーティリティ化）
 - [x] Chat サーバー（Gemini SSE プロキシ）/ クライアント（右ドロワー＋入力欄）
   - [x] SSE ペース調整（`NEXT_PUBLIC_SOLOHACK_SSE_PACE_MS`）
   - [x] 自動スクロール追従
@@ -46,7 +47,9 @@ SoloHack はソロ開発をゲーム感覚で継続できる体験を提供す�
   
 - [x] アバター画像パイプライン（sharpで resize/trim、`npm run avatars:check/build`）
 - [ ] タスク CRUD（Supabase + RLS、HUD進捗）
-- [ ] 設定画面（AI名/口調、テーマ、ストリーム既定、遅延ms）
+- [x] 設定画面（AI名/口調、テーマ、ストリーム既定、遅延ms）
+- [x] Chat 改善（自己紹介抑制、Clear、履歴リセット、SYS 表示、タイプライターの残存テキスト対策）
+- [x] ファイルエクスプローラ（プロジェクトディレクトリ可視化、/explorer、API: /api/fs/list, /api/fs/read）
 - [ ] スモークE2E（タイトル→ダッシュボード→チャット/設定）
 - [ ] パフォーマンス/A11y 初期調整（LCP/CLS/フォーカス可視）
 
@@ -56,6 +59,35 @@ SoloHack はソロ開発をゲーム感覚で継続できる体験を提供す�
 - [ ] モバイル（React Native）/デスクトップ（Tauri/Electron）検討と試作
 - [ ] AI パーソナリティ・モード拡張、チーム/コミュニティ機能の企画
 - [ ] デプロイ/通知との連携自動化の検証
+
+## フェーズ4: 初心者向けAIコーディング環境（エディタ中心）
+目的: 個人開発初心者がゲーム感覚で「編集→実行→学び→成果共有」まで一貫できるUIUXの提供。
+
+- [ ] 中央エディタ（Monaco）統合（タブ・未保存バッファ・差分ビュー）
+- [ ] レイアウト再構成（左: クエスト/タスク/タイマー、右: AIコーチ/提案、下: 実行ログ）
+- [ ] クエスト駆動UI（小目標カード・進捗・報酬演出・“今だけ”解説トグル）
+- [ ] ワンクリック実行（Test/TypeCheck/Build/Deployのモック→段階的に実体化）
+- [ ] インラインAI（選択範囲→修正/解説/テスト生成→Diff確認→適用）
+- [ ] Git連携（status/branch/commit、AIコミット文、差分要約）
+- [ ] PR作成（GitHub API）と本文自動生成（チェックリスト/変更点サマリ）
+- [ ] デプロイウィザード（Vercel等。Preflight→プレビューURL）
+- [ ] 失敗時リカバリ（ログ要約→修正パッチ提案→再実行）
+- [ ] アチーブメント（連続日数/テスト合格/コミット等のXP・バッジ）
+
+詳細仕様は docs/EDITOR_MVP.md を参照。
+
+## フェーズ5: モバイル/リモート一貫体験（Mac + iPhone）
+目的: iPhone からも同じUIで編集・実行・確認・デプロイまで可能に。
+
+- [ ] PWA 対応（manifest/Service Worker、オフラインUI骨組み）
+- [ ] モバイルエディタ最適化（CodeMirror6、操作性/IME/選択の安定）
+- [ ] SoloHack Daemon（ローカル橋渡し）最小API（fs/git/run/logs）
+- [ ] ペアリング（QR/短命トークン）、許可オリジン/IP制限
+- [ ] トンネル（Cloudflare Tunnel）統合と起動/状態表示
+- [ ] 接続先スイッチ（Macローカル/クラウドCodespaces）
+- [ ] Runパネル（TypeCheck/Test/Build/Preview/Deploy）＋ログ配信（SSE/WS）
+- [ ] プレビューURL/QR表示、PRプレビュー連携（Vercel/Netlify）
+- [ ] セキュリティ hardening（本番で書込み/実行は既定無効、認証・権限プリセット）
 
 ## 継続タスク
 - [x] ドキュメント多言語化の初期対応（README/AGENTS の英日）
