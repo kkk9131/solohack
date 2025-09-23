@@ -36,6 +36,7 @@ SoloHack はソロ開発をゲーム感覚で継続できる体験を提供す�
 - [x] テーマトークン定義（黒/ネオン・グロー・HUD）とベースレイアウト
 - [x] `Avatar` コンポーネント（idle/talk/celebrate、発光演出）
 - [ ] `useTypewriter`（音声ON/OFF、SSE統合ユーティリティ化）
+ - [x] `useTypewriter`（音声ON/OFF、SSE統合ユーティリティ化）
 - [x] Chat サーバー（Gemini SSE プロキシ）/ クライアント（右ドロワー＋入力欄）
   - [x] SSE ペース調整（`NEXT_PUBLIC_SOLOHACK_SSE_PACE_MS`）
   - [x] 自動スクロール追従
@@ -46,7 +47,9 @@ SoloHack はソロ開発をゲーム感覚で継続できる体験を提供す�
   
 - [x] アバター画像パイプライン（sharpで resize/trim、`npm run avatars:check/build`）
 - [ ] タスク CRUD（Supabase + RLS、HUD進捗）
-- [ ] 設定画面（AI名/口調、テーマ、ストリーム既定、遅延ms）
+- [x] 設定画面（AI名/口調、テーマ、ストリーム既定、遅延ms）
+- [x] Chat 改善（自己紹介抑制、Clear、履歴リセット、SYS 表示、タイプライターの残存テキスト対策）
+- [x] ファイルエクスプローラ（プロジェクトディレクトリ可視化、/explorer、API: /api/fs/list, /api/fs/read）
 - [ ] スモークE2E（タイトル→ダッシュボード→チャット/設定）
 - [ ] パフォーマンス/A11y 初期調整（LCP/CLS/フォーカス可視）
 

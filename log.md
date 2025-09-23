@@ -45,3 +45,5 @@
 - 2025-09-23 設定画面への導線を追加（HomeのContinue横、DashboardヘッダーのSettingsリンク）。
 - 2025-09-23 HomeのSettingsリンクを削除（Dashboardヘッダーのみ）。SettingsにAPIキー入力(Gemini/Supabase)を追加し、GeminiキーはチャットAPIで上書き可能に。
 - 2025-09-23 Chat改善: ヘッダーにClear追加、パネル閉鎖時に履歴クリア。systemメッセージをSYS>表示に変更。APIプロンプトに「毎回の挨拶不要」を追記。
+- 2025-09-23 Webにファイルエクスプローラを追加（/explorer）。API（/api/fs/list, /api/fs/read）でリポジトリ配下を安全に一覧/プレビュー。DashboardにExplorerリンクを追加。
+- 2025-09-23 ロードマップを最新化（設定画面・useTypewriter・Chat改善・Explorer を完了扱いに更新）。
