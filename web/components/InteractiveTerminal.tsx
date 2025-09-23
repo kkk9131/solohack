@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from 'react';
-import { Terminal } from 'xterm';
-import { FitAddon } from 'xterm-addon-fit';
-import 'xterm/css/xterm.css';
+import { Terminal } from '@xterm/xterm';
+import { FitAddon } from '@xterm/addon-fit';
+import '@xterm/xterm/css/xterm.css';
 
 // 日本語メモ: WebSocket ではなく SSE + REST で双方向を実現（入力はPOST、出力はSSE）。
 
@@ -20,17 +20,51 @@ export default function InteractiveTerminal() {
       fontSize: 13,
       convertEol: true,
       cursorBlink: true,
-      theme: { background: '#000000' },
+      allowTransparency: false,
+      theme: {
+        background: '#0b0f16',
+        foreground: '#e5e7eb',
+        cursor: '#00d8ff',
+        cursorAccent: '#0b0f16',
+        selectionBackground: 'rgba(0, 216, 255, 0.25)',
+        black: '#1f2937',
+        red: '#ff616e',
+        green: '#a3ff00',
+        yellow: '#f59e0b',
+        blue: '#00d8ff',
+        magenta: '#ff00d8',
+        cyan: '#34d399',
+        white: '#e5e7eb',
+        brightBlack: '#374151',
+        brightWhite: '#ffffff',
+      },
     });
     const fit = new FitAddon();
     term.loadAddon(fit);
     termRef.current = term;
     fitRef.current = fit;
-    if (containerRef.current) term.open(containerRef.current);
-    setTimeout(() => fit.fit(), 0);
+    let opened = false;
+    const tryOpen = () => {
+      if (opened) return;
+      const el = containerRef.current;
+      if (!el) { requestAnimationFrame(tryOpen); return; }
+      const { clientWidth, clientHeight } = el;
+      if (clientWidth <= 0 || clientHeight <= 0) { requestAnimationFrame(tryOpen); return; }
+      try {
+        term.open(el);
+        opened = true;
+        // 初回は明示リサイズせず、描画安定後にfitは start() 側で実行
+      } catch {
+        requestAnimationFrame(tryOpen);
+      }
+    };
+    requestAnimationFrame(tryOpen);
+
     const onResize = () => {
-      fit.fit();
-      if (sessionId) sendResize();
+      // セッション中のみfit（未起動時は何もしない）
+      if (!sessionId) return;
+      try { fit.fit(); } catch {}
+      void sendResize();
     };
     window.addEventListener('resize', onResize);
     return () => {
@@ -56,7 +90,8 @@ export default function InteractiveTerminal() {
     setError('');
     const term = termRef.current!;
     term.reset();
-    term.writeln('\x1b[36mStarting shell...\x1b[0m');
+    // フィットしてから出力
+    try { const fit = fitRef.current; fit && fit.fit(); } catch {}
     try {
       const res = await fetch('/api/pty/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cols: term.cols, rows: term.rows }) });
       if (!res.ok) throw new Error(await res.text());
@@ -75,10 +110,8 @@ export default function InteractiveTerminal() {
       });
       term.focus();
       term.onData((d) => {
-        if (!sessionId) return;
-        // NOTE: セッション確立直後に onData が走る可能性対策で最新 id を読む
-        const idNow = id;
-        fetch('/api/pty/input', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: idNow, data: d }) }).catch(() => {});
+        // NOTE: 状態の非同期更新に依存せず、確定した id を使用
+        fetch('/api/pty/input', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, data: d }) }).catch(() => {});
       });
       setRunning(true);
     } catch (e: any) {
@@ -113,10 +146,9 @@ export default function InteractiveTerminal() {
         </div>
       </div>
       {error && <div className="text-xs text-red-400">{error}</div>}
-      <div className="bg-black/80 border border-neon border-opacity-20 rounded-md p-1 min-h-[240px] max-h-[50vh] overflow-hidden">
+      <div className="bg-[#0b0f16] border border-neon border-opacity-20 rounded-md p-1 min-h-[240px] max-h-[50vh] overflow-hidden">
         <div ref={containerRef} className="h-[50vh]" />
       </div>
     </div>
   );
 }
-

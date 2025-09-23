@@ -12,7 +12,14 @@ type Session = {
   cwd: string;
 };
 
-const sessions = new Map<string, Session>();
+// 日本語メモ: 開発中のホットリロードでモジュールが再評価されてもセッションを維持するため、
+// globalThis にセッションマップを格納する。
+declare global {
+  // eslint-disable-next-line no-var
+  var __SLH_PTY_SESSIONS__: Map<string, Session> | undefined;
+}
+const sessions: Map<string, Session> = (globalThis as any).__SLH_PTY_SESSIONS__ || new Map<string, Session>();
+(globalThis as any).__SLH_PTY_SESSIONS__ = sessions;
 
 function genId() {
   return Math.random().toString(36).slice(2, 10);
@@ -57,4 +64,3 @@ export function killSession(id: string) {
 export function listSessions() {
   return Array.from(sessions.values()).map((s) => ({ id: s.id, cwd: s.cwd, createdAt: s.createdAt }));
 }
-
