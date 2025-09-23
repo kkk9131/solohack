@@ -70,9 +70,20 @@ export default function StudioPage() {
 
   return (
     <main className="min-h-dvh p-3 md:p-4">
-      <div className="studio-grid">
+      <div
+        className="grid gap-3"
+        style={{
+          gridTemplateColumns: '280px 1fr 380px',
+          gridTemplateRows: 'auto 1fr 240px',
+          gridTemplateAreas: `
+            'left toolbar right'
+            'left editor  right'
+            'bottom bottom bottom'
+          `,
+        }}
+      >
         {/* 左: タスク/タイマー */}
-        <section className="hud-card p-3 space-y-3 min-h-0 overflow-auto" style={{ gridArea: 'left' }}>
+        <section className="hud-card p-3 space-y-3 min-h-0" style={{ gridArea: 'left' }}>
           <div className="text-neon font-semibold">Quests</div>
           <HUDProgress value={completion} />
           <div className="border-t border-neon/20 pt-3">
@@ -93,27 +104,13 @@ export default function StudioPage() {
         </section>
 
         {/* ツールバー（中央上） */}
-        <header className="hud-card p-2 flex items-center gap-2 sticky top-0 z-10" style={{ gridArea: 'toolbar' }}>
+        <header className="hud-card p-2 flex items-center gap-2" style={{ gridArea: 'toolbar' }}>
           <input
             value={path}
             onChange={(e) => setPath(e.target.value)}
             placeholder="workspace 相対パス（例: web/app/page.tsx）"
             className="flex-1 bg-bg text-white/90 placeholder:text-white/40 border border-neon/20 rounded-md px-3 py-1.5 focus:outline-none focus:border-neon/40"
           />
-          <div className="relative">
-            <details className="group">
-              <summary className="px-3 py-1.5 border border-neon/40 rounded-md text-neon hover:bg-neon/10 cursor-pointer list-none">Examples</summary>
-              <div className="absolute right-0 mt-1 w-64 bg-hud bg-opacity-95 border border-neon/20 rounded-md shadow-glow p-2 z-20">
-                {['web/app/page.tsx','web/app/dashboard/page.tsx','web/app/explorer/page.tsx','web/components/ChatPanel.tsx'].map((ex)=> (
-                  <button
-                    key={ex}
-                    onClick={() => { setPath(ex); }}
-                    className="block w-full text-left px-2 py-1 text-sm text-white/90 hover:bg-neon/10 rounded"
-                  >{ex}</button>
-                ))}
-              </div>
-            </details>
-          </div>
           <button
             onClick={openFromWorkspace}
             disabled={!path.trim() || loading}
@@ -141,7 +138,7 @@ export default function StudioPage() {
         </section>
 
         {/* 右: チャット（オーバーレイの既存パネルを利用） */}
-        <aside className="hud-card p-3 min-h-0 overflow-auto" style={{ gridArea: 'right' }}>
+        <aside className="hud-card p-3 min-h-0" style={{ gridArea: 'right' }}>
           <div className="text-neon mb-2">AI Coach</div>
           <div className="text-xs text-white/60 mb-3">コード選択→質問/改善は右のチャットを開いて実行</div>
           <div className="text-white/50 text-xs">Chat is {chatOpen ? 'visible' : 'hidden'}.</div>
@@ -149,41 +146,11 @@ export default function StudioPage() {
         </aside>
 
         {/* 下: 実行ログ */}
-        <section className="hud-card p-3 min-h-0 overflow-auto" style={{ gridArea: 'bottom' }}>
+        <section className="hud-card p-3 min-h-0" style={{ gridArea: 'bottom' }}>
           <div className="text-neon mb-2">Run Panel</div>
           <div className="h-[180px]"><RunPanel /></div>
         </section>
       </div>
-      {/* レイアウトCSS（レスポンシブでグリッド切替） */}
-      <style jsx>{`
-        .studio-grid {
-          display: grid;
-          gap: 0.75rem; /* 12px */
-          grid-template-columns: 1fr;
-          grid-template-rows: auto 1fr auto;
-          grid-template-areas:
-            'toolbar'
-            'editor'
-            'bottom';
-          min-height: 80dvh;
-        }
-        @media (min-width: 1024px) {
-          .studio-grid {
-            grid-template-columns: 280px 1fr 360px;
-            grid-template-rows: auto 1fr 220px;
-            grid-template-areas:
-              'left toolbar right'
-              'left editor  right'
-              'bottom bottom bottom';
-            min-height: calc(100dvh - 2rem);
-          }
-        }
-        @media (min-width: 1280px) {
-          .studio-grid {
-            grid-template-columns: 300px 1fr 400px;
-          }
-        }
-      `}</style>
     </main>
   );
 }
