@@ -15,7 +15,8 @@ export default function StudioPage() {
   useEffect(() => { tasksCtl.refresh(); }, [tasksCtl.refresh]);
   const completion = tasksCtl.completion;
 
-  // 右ペイン（チャット）: サイドバー常設
+  // 右ペイン（チャット）
+  const [chatOpen, setChatOpen] = useState(false);
   const [qopen, setQopen] = useState(false);
   const [focusMode, setFocusMode] = useState(false); // 左右/下のペインを隠してエディタ集中
 
@@ -166,6 +167,10 @@ export default function StudioPage() {
             className="px-3 py-1.5 border border-neon/40 rounded-md text-neon hover:bg-neon/10"
             title="Focus mode (toggle side/bottom)"
           >{focusMode ? 'Exit Focus' : 'Focus'}</button>
+          <button
+            onClick={() => setChatOpen((v) => !v)}
+            className="px-3 py-1.5 border border-neon/40 rounded-md text-neon hover:bg-neon/10"
+          >{chatOpen ? 'Hide Chat' : 'Show Chat'}</button>
         </header>
 
         {/* 中央: Monaco */}
@@ -175,12 +180,12 @@ export default function StudioPage() {
           </div>
         </section>
 
-        {/* 右: チャット（サイドバー常設） */}
-        <aside className="hidden lg:block hud-card p-0 min-h-0 overflow-hidden" style={{ gridArea: 'right' }}>
-          <div className="p-3 border-b border-neon/20 text-neon">AI Coach</div>
-          <div className="h-[calc(100%-2.5rem)]">
-            <ChatPanel open embedded onClose={() => {}} />
-          </div>
+        {/* 右: チャット（オーバーレイの既存パネルを利用） */}
+        <aside className="hidden lg:block hud-card p-3 min-h-0 overflow-auto" style={{ gridArea: 'right' }}>
+          <div className="text-neon mb-2">AI Coach</div>
+          <div className="text-xs text-white/60 mb-3">コード選択→質問/改善は右のチャットを開いて実行</div>
+          <div className="text-white/50 text-xs">Chat is {chatOpen ? 'visible' : 'hidden'}.</div>
+          <ChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />
         </aside>
 
         {/* 下: 実行ログ */}

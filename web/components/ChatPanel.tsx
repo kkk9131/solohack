@@ -9,12 +9,10 @@ export default function ChatPanel({
   open,
   onClose,
   onStreamingChange,
-  embedded = false,
 }: {
   open: boolean;
   onClose: () => void;
   onStreamingChange?: (streaming: boolean) => void;
-  embedded?: boolean; // 日本語メモ: 右サイドバーに埋め込み表示するモード
 }) {
   // 日本語メモ: タイプライター + SSE ペーサ + 効果音（ENVを初期値に、/commandで更新）
   const envDefaults = useMemo(() => ({
@@ -79,31 +77,26 @@ export default function ChatPanel({
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const cmdRef = useRef<HTMLDivElement | null>(null);
   const [noStreamPref, setNoStreamPref] = useState<boolean>(false);
-  const containerClass = embedded
-    ? 'w-full h-full bg-hud bg-opacity-95 border-l lg:border border-neon border-opacity-20 shadow-glow p-4 overflow-y-auto'
-    : 'fixed inset-y-0 right-0 w-full max-w-md bg-hud bg-opacity-95 border-l border-neon border-opacity-20 shadow-glow p-4 z-50 overflow-y-auto';
 
   // 自動スクロール（新しいテキスト/履歴/フォールバックの変化時に最下部へ）
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [history, typeText, typingFallback, streaming]);
 
-  const isOpen = embedded ? true : open;
-
   useEffect(() => {
-    if (!isOpen) return;
+    if (!open) return;
     return () => {
       abortRef.current?.abort();
       cancel();
     };
-  }, [isOpen, cancel]);
+  }, [open, cancel]);
 
   // 日本語メモ: パネルを閉じたら次回のために履歴をクリア
   useEffect(() => {
-    if (!isOpen) {
+    if (!open) {
       setHistory([]);
     }
-  }, [isOpen]);
+  }, [open]);
 
   // 日本語メモ: 設定（AI名/口調、ストリーム既定、遅延ms）を読込み、チャットの初期値に反映
   useEffect(() => {
@@ -298,13 +291,13 @@ export default function ChatPanel({
 
   return (
     <AnimatePresence>
-      {isOpen && (
+      {open && (
         <motion.aside
           initial={{ x: '100%' }}
           animate={{ x: 0 }}
           exit={{ x: '100%' }}
           transition={{ type: 'spring', stiffness: 200, damping: 24 }}
-          className={containerClass}
+          className="fixed inset-y-0 right-0 w-full max-w-md bg-hud bg-opacity-95 border-l border-neon border-opacity-20 shadow-glow p-4 z-50 overflow-y-auto"
           role="dialog"
           aria-modal="true"
         >
@@ -318,11 +311,9 @@ export default function ChatPanel({
               >
                 Clear
               </button>
-              {!embedded && (
-                <button onClick={onClose} className="px-3 py-1 text-sm border border-neon border-opacity-40 rounded-md hover:bg-neon hover:bg-opacity-10">
-                  Close
-                </button>
-              )}
+              <button onClick={onClose} className="px-3 py-1 text-sm border border-neon border-opacity-40 rounded-md hover:bg-neon hover:bg-opacity-10">
+                Close
+              </button>
             </div>
           </div>
           <div className="grid grid-cols-[1fr_auto] gap-4 items-start">
