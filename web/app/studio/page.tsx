@@ -6,6 +6,7 @@ import TasksBoard from '@/components/TasksBoard';
 import HUDProgress from '@/components/HUDProgress';
 import ChatPanel from '@/components/ChatPanel';
 import RunPanel from '@/components/RunPanel';
+import QuickOpen from '@/components/QuickOpen';
 import useTasksController from '@/lib/useTasksController';
 
 export default function StudioPage() {
@@ -16,6 +17,8 @@ export default function StudioPage() {
 
   // 右ペイン（チャット）
   const [chatOpen, setChatOpen] = useState(false);
+  const [qopen, setQopen] = useState(false);
+  const [focusMode, setFocusMode] = useState(false); // 左右/下のペインを隠してエディタ集中
 
   // 中央（Monaco）
   const [path, setPath] = useState<string>('');
@@ -23,6 +26,8 @@ export default function StudioPage() {
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [loaded, setLoaded] = useState('');
   const truncated = useMemo(() => false, []);
 
   const canSave = !!path && !truncated;
@@ -36,6 +41,8 @@ export default function StudioPage() {
       if (!res.ok) throw new Error(await res.text());
       const text = await res.text();
       setContent(text);
+      setLoaded(text);
+      setDirty(false);
     } catch (e: any) {
       setContent(`// Failed to open: ${e?.message ?? 'unknown'}`);
     } finally {
@@ -55,6 +62,8 @@ export default function StudioPage() {
       });
       if (!res.ok) throw new Error(await res.text());
       setNote('Saved');
+      setLoaded(content);
+      setDirty(false);
       setTimeout(() => setNote(''), 1500);
     } catch (e: any) {
       setNote(e?.message ?? 'Failed to save');
@@ -68,9 +77,30 @@ export default function StudioPage() {
     if (!content) setContent('// Select a file from workspace and start editing.');
   }, [content]);
 
+  // 変更フラグと離脱ガード
+  useEffect(() => { setDirty(loaded !== '' && content !== loaded); }, [content, loaded]);
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (dirty) { e.preventDefault(); e.returnValue = ''; }
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [dirty]);
+
+  // ショートカット: Cmd/Ctrl+S 保存, Cmd/Ctrl+P クイックオープン
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); saveToWorkspace(); }
+      if (mod && e.key.toLowerCase() === 'p') { e.preventDefault(); setQopen(true); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [saveToWorkspace]);
+
   return (
     <main className="min-h-dvh p-3 md:p-4">
-      <div className="studio-grid">
+      <div className={`studio-grid ${focusMode ? 'focus' : ''}`}>
         {/* 左: タスク/タイマー */}
         <section className="hidden lg:block hud-card p-3 space-y-3 min-h-0 overflow-auto" style={{ gridArea: 'left' }}>
           <div className="text-neon font-semibold">Quests</div>
@@ -100,6 +130,11 @@ export default function StudioPage() {
             placeholder="workspace 相対パス（例: web/app/page.tsx）"
             className="flex-1 bg-bg text-white/90 placeholder:text-white/40 border border-neon/20 rounded-md px-3 py-1.5 focus:outline-none focus:border-neon/40"
           />
+          <button
+            onClick={() => setQopen(true)}
+            className="px-3 py-1.5 border border-neon/40 rounded-md text-neon hover:bg-neon/10"
+            title="Quick Open (⌘/Ctrl+P)"
+          >Quick Open</button>
           <div className="relative">
             <details className="group">
               <summary className="px-3 py-1.5 border border-neon/40 rounded-md text-neon hover:bg-neon/10 cursor-pointer list-none">Examples</summary>
@@ -124,9 +159,14 @@ export default function StudioPage() {
             disabled={!canSave || saving}
             className="px-3 py-1.5 border border-neon/40 rounded-md text-neon hover:bg-neon/10 disabled:opacity-50"
             title={canSave ? 'Save to workspace' : 'Truncated or no file'}
-          >Save</button>
+          >{dirty ? 'Save*' : 'Save'}</button>
           <span className="text-xs text-neon text-opacity-70">{note}</span>
           <div className="flex-1" />
+          <button
+            onClick={() => setFocusMode((v) => !v)}
+            className="px-3 py-1.5 border border-neon/40 rounded-md text-neon hover:bg-neon/10"
+            title="Focus mode (toggle side/bottom)"
+          >{focusMode ? 'Exit Focus' : 'Focus'}</button>
           <button
             onClick={() => setChatOpen((v) => !v)}
             className="px-3 py-1.5 border border-neon/40 rounded-md text-neon hover:bg-neon/10"
@@ -154,6 +194,7 @@ export default function StudioPage() {
           <div className="h-[180px]"><RunPanel /></div>
         </section>
       </div>
+      <QuickOpen open={qopen} onClose={() => setQopen(false)} onPick={(rel) => { setPath(rel); setTimeout(() => openFromWorkspace(), 0); }} />
       {/* レイアウトCSS（レスポンシブでグリッド切替） */}
       <style jsx>{`
         .studio-grid {
@@ -167,6 +208,12 @@ export default function StudioPage() {
             'bottom';
           min-height: 80dvh;
         }
+        .studio-grid.focus {
+          grid-template-rows: auto 1fr;
+          grid-template-areas:
+            'toolbar'
+            'editor';
+        }
         @media (min-width: 1024px) {
           .studio-grid {
             grid-template-columns: 280px 1fr 360px;
@@ -176,6 +223,13 @@ export default function StudioPage() {
               'left editor  right'
               'bottom bottom bottom';
             min-height: calc(100dvh - 2rem);
+          }
+          .studio-grid.focus {
+            grid-template-columns: 1fr;
+            grid-template-rows: auto 1fr;
+            grid-template-areas:
+              'toolbar'
+              'editor';
           }
         }
         @media (min-width: 1280px) {
