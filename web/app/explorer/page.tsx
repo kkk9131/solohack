@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useMemo, useState } from 'react';
-import EditorPane from '@/components/EditorPane';
 
 type Entry = { name: string; type: 'dir' | 'file'; size?: number; mtimeMs: number };
 
@@ -297,9 +296,11 @@ export default function ExplorerPage() {
                 </>
               ) : (
                 <>
-                  <div className="min-h-[40vh] max-h-[60vh] h-[50vh] border border-neon/20 rounded-md overflow-hidden">
-                    <EditorPane path={preview.path} value={editContent} onChange={setEditContent} />
-                  </div>
+                  <textarea
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    className="w-full text-xs min-h-[40vh] max-h-[60vh] bg-bg/60 p-3 rounded-md border border-neon border-opacity-10"
+                  />
                   <div className="flex items-center gap-2">
                     <button onClick={saveEdit} disabled={saving} className="px-2 py-1 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10 text-xs disabled:opacity-40">Save</button>
                     <button onClick={() => setEditing(false)} className="px-2 py-1 border border-neon border-opacity-20 rounded-md text-white/80 hover:bg-neon hover:bg-opacity-10 text-xs">Cancel</button>
@@ -389,9 +390,11 @@ export default function ExplorerPage() {
                 </>
               ) : (
                 <>
-                  <div className="min-h-[40vh] max-h-[60vh] h-[50vh] border border-neon/20 rounded-md overflow-hidden">
-                    <EditorPane path={localPreview.path} value={localEditContent} onChange={setLocalEditContent} />
-                  </div>
+                  <textarea
+                    value={localEditContent}
+                    onChange={(e) => setLocalEditContent(e.target.value)}
+                    className="w-full text-xs min-h-[40vh] max-h-[60vh] bg-bg/60 p-3 rounded-md border border-neon border-opacity-10"
+                  />
                   <div className="flex items-center gap-2">
                     <button onClick={saveLocalEdit} className="px-2 py-1 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10 text-xs">Save</button>
                     <button onClick={() => setLocalEditing(false)} className="px-2 py-1 border border-neon border-opacity-20 rounded-md text-white/80 hover:bg-neon hover:bg-opacity-10 text-xs">Cancel</button>
