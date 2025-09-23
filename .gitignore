@@ -11,3 +11,4 @@ web/.next
 
 # YoYo AI version control directory
 .yoyo/
+*.tsbuildinfo

@@ -50,3 +50,4 @@
 - 2025-09-23 フェーズ4（初心者向けエディタ中心AI開発）をロードマップに追加し、詳細仕様 docs/EDITOR_MVP.md を作成。
 - 2025-09-23 モバイル/リモート一貫体験（Mac + iPhone）の方針を docs/EDITOR_MVP.md に追記（PWA/Daemon/トンネル/接続スイッチ/Runパネル/プレビューQR）。
 - 2025-09-23 ロードマップにフェーズ5（モバイル/リモート一貫体験）を追加。
+- 2025-09-24 フェーズ4初期実装（Web）：/editor に Monaco エディタ・Workspace/Local 切替・右ドロワーAIチャット(Avatar連動)・Run（SSEプリセット）・Interactive Terminal（xterm+node-pty）を追加。web/.env.example に RUN/PTY/REPO_ROOT を追記。ドキュメント docs/PHASE4_EDITOR_SETUP.md を追加。
