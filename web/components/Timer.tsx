@@ -18,36 +18,31 @@ export default function Timer({
 }) {
   // 初期値は props または保存値から復元
   const initialDuration = minutes * 60;
-  const [state, setState] = useState<TimerState>(() => {
+  const [state, setState] = useState<TimerState>({ duration: initialDuration, remain: initialDuration, running: false });
+
+  const intervalRef = useRef<number | null>(null);
+  const [presets, setPresets] = useState<number[]>([25, 50, 5]);
+  // 日本語メモ: マウント後に localStorage から復元
+  useEffect(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEY) : null;
       if (saved) {
         const obj = JSON.parse(saved) as TimerState;
-        if (
-          typeof obj?.duration === 'number' &&
-          typeof obj?.remain === 'number' &&
-          typeof obj?.running === 'boolean'
-        ) {
-          return obj;
+        if (typeof obj?.duration === 'number' && typeof obj?.remain === 'number' && typeof obj?.running === 'boolean') {
+          setState(obj);
         }
       }
     } catch {}
-    return { duration: initialDuration, remain: initialDuration, running: false };
-  });
-
-  const intervalRef = useRef<number | null>(null);
-  const [presets, setPresets] = useState<number[]>(() => {
     try {
-      const raw = localStorage.getItem('slh_timer_presets_v1');
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem('slh_timer_presets_v1') : null;
       if (raw) {
         const arr = JSON.parse(raw) as number[];
         if (Array.isArray(arr) && arr.every((n) => typeof n === 'number' && n > 0)) {
-          return Array.from(new Set(arr.map((n) => Math.round(n))));
+          setPresets(Array.from(new Set(arr.map((n) => Math.round(n)))));
         }
       }
     } catch {}
-    return [25, 50, 5];
-  });
+  }, []);
   const [customStart, setCustomStart] = useState('');
   const [newPreset, setNewPreset] = useState('');
 

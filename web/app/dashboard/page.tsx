@@ -1,15 +1,22 @@
 "use client";
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Avatar from '@/components/Avatar';
 import ChatPanel from '@/components/ChatPanel';
 import Timer from '@/components/Timer';
 import HUDProgress from '@/components/HUDProgress';
+import TasksBoard from '@/components/TasksBoard';
+import useTasksController from '@/lib/useTasksController';
 
 export default function DashboardPage() {
   const [chatOpen, setChatOpen] = useState(false);
   const [avatarState, setAvatarState] = useState<'idle' | 'talk' | 'celebrate'>('idle');
   const [flash, setFlash] = useState(false);
+  const tasksCtl = useTasksController();
+
+  // 初期ロード
+  // 日本語メモ: 初回マウントでタスク取得。以降は操作時に refresh される。
+  useEffect(() => { tasksCtl.refresh(); }, [tasksCtl.refresh]);
 
   return (
     <main className="min-h-dvh p-6 md:p-10 space-y-8">
@@ -32,7 +39,7 @@ export default function DashboardPage() {
               <div className="text-xs text-neon text-opacity-70">Idle/Talk/Celebrate</div>
             </div>
           </div>
-          <HUDProgress value={40} />
+          <HUDProgress value={tasksCtl.completion} />
         </div>
 
         <div className="hud-card p-4 space-y-4 lg:col-span-2">
@@ -50,8 +57,16 @@ export default function DashboardPage() {
       </section>
 
       <section className="hud-card p-4">
-        <motion.h3 className="text-neon mb-4">Tasks (placeholder)</motion.h3>
-        <div className="text-neon text-opacity-70 text-sm">Supabase連携前のプレースホルダです。</div>
+        <motion.h3 className="text-neon mb-4">Tasks</motion.h3>
+        <TasksBoard
+          tasks={tasksCtl.tasks}
+          loading={tasksCtl.loading}
+          analyzing={tasksCtl.analyzing}
+          add={tasksCtl.add}
+          del={tasksCtl.del}
+          setStatus={tasksCtl.setStatus}
+          analyzeDeps={tasksCtl.analyzeDeps}
+        />
       </section>
 
       <ChatPanel

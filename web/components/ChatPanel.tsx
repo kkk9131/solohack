@@ -25,22 +25,33 @@ export default function ChatPanel({
     soundStep: Number(process.env.NEXT_PUBLIC_SOLOHACK_SOUND_STEP) || 2,
   }), []);
 
-  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
-    const s = localStorage.getItem('slh_sound_enabled');
-    return s == null ? envDefaults.soundEnabled : s === 'true';
-  });
-  const [ssePace, setSsePace] = useState<number>(() => {
-    const s = localStorage.getItem('slh_speed_ms');
-    return s == null ? envDefaults.ssePace : Number(s) || 0;
-  });
-  const [fallbackDelay, setFallbackDelay] = useState<number>(() => {
-    const s = localStorage.getItem('slh_fallback_delay_ms');
-    return s == null ? envDefaults.fallbackDelay : Number(s) || 60;
-  });
-  useEffect(() => { localStorage.setItem('slh_sound_enabled', String(soundEnabled)); }, [soundEnabled]);
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(envDefaults.soundEnabled);
+  const [ssePace, setSsePace] = useState<number>(envDefaults.ssePace);
+  const [fallbackDelay, setFallbackDelay] = useState<number>(envDefaults.fallbackDelay);
+  // 日本語メモ: SSR環境では localStorage が無いので初期化はマウント後に実施
   useEffect(() => {
-    localStorage.setItem('slh_speed_ms', String(ssePace));
-    localStorage.setItem('slh_fallback_delay_ms', String(fallbackDelay));
+    try {
+      if (typeof window !== 'undefined') {
+        const s = window.localStorage.getItem('slh_sound_enabled');
+        if (s != null) setSoundEnabled(s === 'true');
+        const sp = window.localStorage.getItem('slh_speed_ms');
+        if (sp != null) setSsePace(Number(sp) || 0);
+        const fd = window.localStorage.getItem('slh_fallback_delay_ms');
+        if (fd != null) setFallbackDelay(Number(fd) || envDefaults.fallbackDelay);
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    try { if (typeof window !== 'undefined') window.localStorage.setItem('slh_sound_enabled', String(soundEnabled)); } catch {}
+  }, [soundEnabled]);
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('slh_speed_ms', String(ssePace));
+        window.localStorage.setItem('slh_fallback_delay_ms', String(fallbackDelay));
+      }
+    } catch {}
   }, [ssePace, fallbackDelay]);
 
   const soundFreq = envDefaults.soundFreq;
