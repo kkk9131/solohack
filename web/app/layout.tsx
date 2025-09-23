@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Press_Start_2P, DotGothic16 } from 'next/font/google';
 import ThemeInit from '@/components/ThemeInit';
-import TopNav from '@/components/TopNav';
 
 export const metadata: Metadata = {
   title: 'SoloHack Web',
@@ -18,7 +17,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ja" className={`dark ${pixel.variable} ${dot.variable}`}>
       <body className="min-h-dvh bg-bg text-white">
         <ThemeInit />
-        <TopNav />
         {children}
       </body>
     </html>
