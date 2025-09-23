@@ -11,31 +11,45 @@ export default function InteractiveTerminal() {
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const sseRef = useRef<EventSource | null>(null);
+  const dataListenerRef = useRef<{ dispose: () => void } | null>(null);
   const [sessionId, setSessionId] = useState<string>('');
   const [running, setRunning] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
+    // エディタ背景（--bg）とネオン色（--neon）をCSS変数から取得
+    let bg = '#0b0f14';
+    let neon = '#00d8ff';
+    try {
+      const cs = getComputedStyle(document.documentElement);
+      bg = (cs.getPropertyValue('--bg').trim() || bg);
+      neon = (cs.getPropertyValue('--neon').trim() || neon);
+    } catch {}
+
     const term = new Terminal({
       fontSize: 13,
       convertEol: true,
       cursorBlink: true,
+      scrollback: 10000,
       allowTransparency: false,
+      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+      drawBoldTextInBrightColors: true as any,
       theme: {
-        background: '#0b0f16',
+        background: bg,
         foreground: '#e5e7eb',
-        cursor: '#00d8ff',
-        cursorAccent: '#0b0f16',
+        cursor: neon,
+        cursorAccent: bg,
         selectionBackground: 'rgba(0, 216, 255, 0.25)',
-        black: '#1f2937',
+        // ANSI colors tuned for dark background visibility
+        black: '#9ca3af',
         red: '#ff616e',
         green: '#a3ff00',
         yellow: '#f59e0b',
-        blue: '#00d8ff',
+        blue: neon,
         magenta: '#ff00d8',
         cyan: '#34d399',
         white: '#e5e7eb',
-        brightBlack: '#374151',
+        brightBlack: '#cbd5e1',
         brightWhite: '#ffffff',
       },
     });
@@ -88,6 +102,8 @@ export default function InteractiveTerminal() {
   async function start() {
     if (running) return;
     setError('');
+    // 既存の接続があれば安全に停止
+    try { await stop(); } catch {}
     const term = termRef.current!;
     term.reset();
     // フィットしてから出力
@@ -97,19 +113,32 @@ export default function InteractiveTerminal() {
       if (!res.ok) throw new Error(await res.text());
       const { id } = await res.json();
       setSessionId(id);
+      // 既存のSSEを閉じてから新規接続
+      try { sseRef.current?.close(); } catch {}
       const es = new EventSource(`/api/pty/stream?id=${encodeURIComponent(id)}`);
       sseRef.current = es;
+      let opened = false;
+      es.onopen = () => { opened = true; setRunning(true); };
       es.addEventListener('out', (e: MessageEvent) => {
         term.write(e.data as string);
       });
       es.addEventListener('exit', (e: MessageEvent) => {
         term.writeln(`\r\n\x1b[33m[process exited ${e.data}]\x1b[0m`);
       });
-      es.addEventListener('error', () => {
+      es.addEventListener('error', async () => {
         term.writeln('\r\n\x1b[31m[connection error]\x1b[0m');
+        try {
+          const r = await fetch(`/api/pty/status?id=${encodeURIComponent(id)}`);
+          if (!r.ok) {
+            term.writeln(`\r\nstatus: ${r.status} ${r.statusText}`);
+          }
+        } catch {}
+        setRunning(false);
       });
       term.focus();
-      term.onData((d) => {
+      // 既存の onData をクリア（多重ハンドラで二重入力になるのを防止）
+      try { dataListenerRef.current?.dispose(); } catch {}
+      dataListenerRef.current = term.onData((d) => {
         // NOTE: 状態の非同期更新に依存せず、確定した id を使用
         fetch('/api/pty/input', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, data: d }) }).catch(() => {});
       });
@@ -126,6 +155,8 @@ export default function InteractiveTerminal() {
       setSessionId('');
       sseRef.current?.close();
       sseRef.current = null;
+      try { dataListenerRef.current?.dispose(); } catch {}
+      dataListenerRef.current = null;
       if (id) await fetch('/api/pty/kill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
     } catch {}
     setRunning(false);
@@ -146,7 +177,7 @@ export default function InteractiveTerminal() {
         </div>
       </div>
       {error && <div className="text-xs text-red-400">{error}</div>}
-      <div className="bg-[#0b0f16] border border-neon border-opacity-20 rounded-md p-1 min-h-[240px] max-h-[50vh] overflow-hidden">
+      <div className="bg-bg border border-neon border-opacity-20 rounded-md p-1 min-h-[240px] max-h-[50vh] overflow-hidden">
         <div ref={containerRef} className="h-[50vh]" />
       </div>
     </div>
