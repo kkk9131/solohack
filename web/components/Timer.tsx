@@ -112,6 +112,7 @@ export default function Timer({
         if (!s.running) return s;
         if (s.remain <= 1) {
           // 完了
+          try { playCelebrateSE(); } catch {}
           queueMicrotask(() => onFinish?.());
           return { ...s, remain: 0, running: false };
         }
@@ -137,6 +138,28 @@ export default function Timer({
 
   const ratio = state.duration === 0 ? 1 : 1 - state.remain / state.duration;
   const percent = Math.max(0, Math.min(100, Math.round(ratio * 100)));
+
+  // 簡易祝福SE（短い上昇メロディ）
+  function playCelebrateSE() {
+    const AC: any = (window as any).AudioContext || (window as any).webkitAudioContext;
+    if (!AC) return;
+    const ac = new AC();
+    const notes = [880, 1047, 1319];
+    const now = ac.currentTime;
+    notes.forEach((f, i) => {
+      const osc = ac.createOscillator();
+      const gain = ac.createGain();
+      osc.connect(gain); gain.connect(ac.destination);
+      osc.type = 'triangle';
+      const t0 = now + i * 0.12; const dur = 0.18;
+      osc.frequency.setValueAtTime(f, t0);
+      gain.gain.setValueAtTime(0.001, t0);
+      gain.gain.linearRampToValueAtTime(0.08, t0 + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+      osc.start(t0); osc.stop(t0 + dur + 0.01);
+    });
+    setTimeout(() => ac.close().catch(() => {}), 800);
+  }
 
   return (
     <div className="space-y-4">
@@ -188,15 +211,34 @@ export default function Timer({
         </form>
       </div>
 
-      {/* 時間表示 */}
-      <div className="text-6xl font-bold tracking-wider text-neon drop-shadow" aria-live="polite">
-        {mmss}
+      {/* 円形リング + 時間表示 */}
+      <div className="flex items-center gap-4">
+        <svg width="76" height="76" viewBox="0 0 44 44" className="drop-shadow">
+          <circle cx="22" cy="22" r="20" fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="3" />
+          <circle
+            cx="22"
+            cy="22"
+            r="20"
+            fill="none"
+            stroke="var(--neon)"
+            strokeWidth="3.5"
+            strokeLinecap="round"
+            style={{
+              transform: 'rotate(-90deg)',
+              transformOrigin: '22px 22px',
+              strokeDasharray: `${2 * Math.PI * 20}`,
+              strokeDashoffset: `${(1 - ratio) * 2 * Math.PI * 20}`,
+              transition: 'stroke-dashoffset .3s ease',
+              filter: 'drop-shadow(0 0 8px var(--glow))',
+            }}
+          />
+        </svg>
+        <div className="text-5xl md:text-6xl font-bold tracking-wider text-neon drop-shadow" aria-live="polite">
+          {mmss}
+        </div>
       </div>
 
-      {/* 進捗バー */}
-      <div className="h-2 bg-white/5 rounded">
-        <div className="h-2 bg-neon rounded shadow-glow" style={{ width: `${percent}%`, transition: 'width 0.3s ease' }} />
-      </div>
+      {/* 水平進捗バーは削除（リング表示に統一） */}
       <div className="text-right text-neon text-opacity-70 text-xs">{percent}%</div>
 
       {/* コントロール */}
