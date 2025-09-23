@@ -72,7 +72,7 @@ export default function StudioPage() {
     <main className="min-h-dvh p-3 md:p-4">
       <div className="studio-grid">
         {/* 左: タスク/タイマー */}
-        <section className="hidden lg:block hud-card p-3 space-y-3 min-h-0 overflow-auto" style={{ gridArea: 'left' }}>
+        <section className="hud-card p-3 space-y-3 min-h-0 overflow-auto" style={{ gridArea: 'left' }}>
           <div className="text-neon font-semibold">Quests</div>
           <HUDProgress value={completion} />
           <div className="border-t border-neon/20 pt-3">
@@ -134,14 +134,14 @@ export default function StudioPage() {
         </header>
 
         {/* 中央: Monaco */}
-        <section className="hud-card p-0 min-h-0 overflow-hidden min-h-[50vh]" style={{ gridArea: 'editor' }}>
+        <section className="hud-card p-0 min-h-0 overflow-hidden" style={{ gridArea: 'editor' }}>
           <div className="h-full" style={{ height: '100%' }}>
             <EditorPane path={path} value={content} onChange={setContent} />
           </div>
         </section>
 
         {/* 右: チャット（オーバーレイの既存パネルを利用） */}
-        <aside className="hidden lg:block hud-card p-3 min-h-0 overflow-auto" style={{ gridArea: 'right' }}>
+        <aside className="hud-card p-3 min-h-0 overflow-auto" style={{ gridArea: 'right' }}>
           <div className="text-neon mb-2">AI Coach</div>
           <div className="text-xs text-white/60 mb-3">コード選択→質問/改善は右のチャットを開いて実行</div>
           <div className="text-white/50 text-xs">Chat is {chatOpen ? 'visible' : 'hidden'}.</div>
