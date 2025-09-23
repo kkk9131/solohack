@@ -78,3 +78,41 @@
 - セキュリティ: 本番での書込み/API実行は既定で無効、認証/権限プリセットを導入
 - AI品質揺らぎ: パッチは必ず Diff レビューを通す、テスト自動化を推奨
 
+---
+
+# モバイル/リモート開発（Mac + iPhone 一貫体験）
+
+目的: Mac の計算資源/FS を活用しつつ、iPhone から同じ UI で「編集→実行→確認→デプロイ」まで行える状態を用意する。
+
+## アーキテクチャ指針
+- 二本立てバックエンド
+  1) ローカル駆動: Mac 上の SoloHack Daemon（Node/WS/REST）に接続（LAN/トンネル）
+  2) クラウド駆動: Codespaces 等のクラウド環境に接続先を切替
+- フロント
+  - Web/PWA（iOSホーム追加）。中央エディタは Desktop=Monaco / Mobile=CodeMirror6（抽象化レイヤーで共通API）
+  - 役割分担: 端末は操作/可視化、実行はバックエンドで実施（ログ/進捗をSSE/WSで配信）
+
+## SoloHack Daemon（ローカル橋渡し）
+- 機能: fs(list/read/write/diff), git(status/branch/commit/push), run(test/typecheck/build/dev), logs(stream)
+- ペアリング: QR（短命トークン）→トークン保存/失効。許可オリジン＋IP制限
+- 到達性: Cloudflare Tunnel 推奨（TLS/WAF/無料枠）。スリープ抑止（macOS: caffeinate）
+
+## PWA/モバイル最適化
+- PWA: manifest/Service Worker、オフラインUI（編集キャッシュ/後同期）
+- iOS UI: 大きめタップ、最小タップ数、片手操作、差分前提の編集（編集→Diff→適用）
+
+## 確認方法（実装後の検証フロー）
+- ライブ開発プレビュー（推奨）
+  - Macで dev server + tunnel を起動 → iPhoneの「Start Preview」でURL/QR表示 → 実機確認
+- PRプレビュー（クラウド）
+  - Push→CI→Vercel/Netlify の Preview URL を iPhone で開く
+- CIチェック
+  - iPhoneから「Run Tests/TypeCheck/Build」→バックエンド実行 → ログをUIで確認 → AIパッチ提案→適用→再実行
+
+## セキュリティ方針
+- 本番は書込み/コマンド実行を既定で無効（フラグで段階解放）。危険操作は Diff 確認必須
+- 秘密情報は localStorage は開発用途に限定。運用はサーバー側秘密管理/パスキー認証
+
+## ロードマップへの反映（抜粋）
+- PWA化、モバイルエディタ最適化、Daemon最小API、トンネル、接続先スイッチ（Mac/クラウド）、Runパネル/ログ、プレビューURL/QR
+

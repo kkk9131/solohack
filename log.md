@@ -48,3 +48,5 @@
 - 2025-09-23 Webにファイルエクスプローラを追加（/explorer）。API（/api/fs/list, /api/fs/read）でリポジトリ配下を安全に一覧/プレビュー。DashboardにExplorerリンクを追加。
 - 2025-09-23 ロードマップを最新化（設定画面・useTypewriter・Chat改善・Explorer を完了扱いに更新）。
 - 2025-09-23 フェーズ4（初心者向けエディタ中心AI開発）をロードマップに追加し、詳細仕様 docs/EDITOR_MVP.md を作成。
+- 2025-09-23 モバイル/リモート一貫体験（Mac + iPhone）の方針を docs/EDITOR_MVP.md に追記（PWA/Daemon/トンネル/接続スイッチ/Runパネル/プレビューQR）。
+- 2025-09-23 ロードマップにフェーズ5（モバイル/リモート一貫体験）を追加。

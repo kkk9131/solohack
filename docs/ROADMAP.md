@@ -76,6 +76,19 @@ SoloHack はソロ開発をゲーム感覚で継続できる体験を提供す�
 
 詳細仕様は docs/EDITOR_MVP.md を参照。
 
+## フェーズ5: モバイル/リモート一貫体験（Mac + iPhone）
+目的: iPhone からも同じUIで編集・実行・確認・デプロイまで可能に。
+
+- [ ] PWA 対応（manifest/Service Worker、オフラインUI骨組み）
+- [ ] モバイルエディタ最適化（CodeMirror6、操作性/IME/選択の安定）
+- [ ] SoloHack Daemon（ローカル橋渡し）最小API（fs/git/run/logs）
+- [ ] ペアリング（QR/短命トークン）、許可オリジン/IP制限
+- [ ] トンネル（Cloudflare Tunnel）統合と起動/状態表示
+- [ ] 接続先スイッチ（Macローカル/クラウドCodespaces）
+- [ ] Runパネル（TypeCheck/Test/Build/Preview/Deploy）＋ログ配信（SSE/WS）
+- [ ] プレビューURL/QR表示、PRプレビュー連携（Vercel/Netlify）
+- [ ] セキュリティ hardening（本番で書込み/実行は既定無効、認証・権限プリセット）
+
 ## 継続タスク
 - [x] ドキュメント多言語化の初期対応（README/AGENTS の英日）
 - [ ] ドキュメント多言語の継続拡充（スクリーンショット・例の同期）
