@@ -7,6 +7,8 @@ type Payload = {
   mode?: 'tech' | 'coach';
   tone?: string;
   assistantName?: string;
+  noStream?: boolean;
+  apiKey?: string; // 日本語メモ: クライアントからの一時キー（開発用途）。
 };
 
 function buildPrompt({ prompt, mode, tone, assistantName }: Payload) {
@@ -18,6 +20,7 @@ function buildPrompt({ prompt, mode, tone, assistantName }: Payload) {
     'ユーザーが行なっているプロジェクトを遂行する良きパートナーとして回答を述べてください。',
     `スタイルは「${style}」で親しく接してください。`,
     'わからない場合は「わかりません」と正直に回答してください。',
+    '以降、毎回の挨拶や自己紹介は不要です。要点を簡潔に述べてください。',
     `モード: ${m}`,
     '',
     prompt,
@@ -27,24 +30,44 @@ function buildPrompt({ prompt, mode, tone, assistantName }: Payload) {
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as Payload;
-    const apiKey = process.env.SOLOHACK_GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    const apiKey = (body.apiKey && body.apiKey.trim()) || process.env.SOLOHACK_GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
     if (!apiKey) {
       return new Response('Missing SOLOHACK_GEMINI_API_KEY/GOOGLE_API_KEY', { status: 500 });
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const modelId = (process.env.SOLOHACK_GEMINI_MODEL || 'gemini-1.5-flash').trim();
+    const model = genAI.getGenerativeModel({ model: modelId });
     const prompt = buildPrompt(body);
-    const result = await model.generateContentStream(prompt);
+    let streamResult: any | null = null;
+    let canStream = !body.noStream;
+    try {
+      if (canStream) {
+        streamResult = await model.generateContentStream(prompt);
+      }
+    } catch {
+      canStream = false; // 一部モデルはストリーム非対応
+    }
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
         const send = (obj: unknown) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
         try {
-          for await (const chunk of result.stream as any) {
-            const t = chunk?.text?.();
-            if (t) send({ token: t });
+          if (canStream && streamResult?.stream) {
+            for await (const chunk of streamResult.stream as any) {
+              const t = chunk?.text?.();
+              if (t) send({ token: t });
+            }
+          } else {
+            // フォールバック: 非ストリームモデル → まとめて取得し1回で送出
+            try {
+              const full = await model.generateContent(prompt);
+              const text = full?.response?.text?.() ?? '';
+              if (text) send({ token: text });
+            } catch (e) {
+              throw e;
+            }
           }
           // flush
           controller.enqueue(encoder.encode('event: done\ndata: [DONE]\n\n'));
@@ -66,4 +89,3 @@ export async function POST(req: Request) {
     return new Response(`Error: ${e?.message ?? 'unknown'}`, { status: 500 });
   }
 }
-
