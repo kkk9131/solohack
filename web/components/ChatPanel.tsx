@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import useTypewriter from '@/lib/useTypewriter';
 import Avatar from '@/components/Avatar';
+import { getSettings } from '@/lib/settings';
 
 export default function ChatPanel({
   open,
@@ -60,7 +61,7 @@ export default function ChatPanel({
   const soundDuration = envDefaults.soundDuration;
   const soundStep = envDefaults.soundStep;
 
-  const { text: typeText, start, append, finalize, cancel } = useTypewriter({
+  const { text: typeText, setText, start, append, finalize, cancel } = useTypewriter({
     delayMs: fallbackDelay,
     paceMs: ssePace,
     sound: { enabled: soundEnabled, freq: soundFreq, volume: soundVolume, endVolume: soundEndVolume, durationMs: soundDuration, step: soundStep },
@@ -75,6 +76,7 @@ export default function ChatPanel({
   const [streaming, setStreaming] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const cmdRef = useRef<HTMLDivElement | null>(null);
+  const [noStreamPref, setNoStreamPref] = useState<boolean>(false);
 
   // 自動スクロール（新しいテキスト/履歴/フォールバックの変化時に最下部へ）
   useEffect(() => {
@@ -88,6 +90,23 @@ export default function ChatPanel({
       cancel();
     };
   }, [open, cancel]);
+
+  // 日本語メモ: パネルを閉じたら次回のために履歴をクリア
+  useEffect(() => {
+    if (!open) {
+      setHistory([]);
+    }
+  }, [open]);
+
+  // 日本語メモ: 設定（AI名/口調、ストリーム既定、遅延ms）を読込み、チャットの初期値に反映
+  useEffect(() => {
+    try {
+      const s = getSettings();
+      setNoStreamPref(s.streamDefault === 'no-stream');
+      setSsePace(s.streamDelayMs);
+      setFallbackDelay(s.streamDelayMs);
+    } catch {}
+  }, []);
 
   function parseCommand(raw: string): string | null {
     const parts = raw.trim().slice(1).split(/\s+/);
@@ -194,6 +213,9 @@ export default function ChatPanel({
       if (res) setHistory((h) => [...h, { role: 'system', content: res }]);
       return;
     }
+    // 日本語メモ: 新規メッセージ開始時にタイプライターの残存テキストをクリア
+    cancel();
+    setText('');
     // ユーザー発言を履歴追加
     setHistory((h) => [...h, { role: 'user', content: message }]);
     setStreaming(true);
@@ -203,10 +225,17 @@ export default function ChatPanel({
     try {
       const ac = new AbortController();
       abortRef.current = ac;
+      const settings = getSettings();
       const res = await fetch('/api/chat/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: message }),
+        body: JSON.stringify({
+          prompt: message,
+          tone: settings.tone,
+          assistantName: settings.assistantName,
+          noStream: noStreamPref,
+          apiKey: settings.geminiApiKey || undefined,
+        }),
         signal: ac.signal,
       });
       if (!res.ok || !res.body) throw new Error('SSE not available');
@@ -274,20 +303,33 @@ export default function ChatPanel({
         >
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-pixel pixel-title text-neon text-base">AI Chat</h3>
-            <button onClick={onClose} className="px-3 py-1 text-sm border border-neon border-opacity-40 rounded-md hover:bg-neon hover:bg-opacity-10">
-              Close
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => { setHistory([]); cancel(); setText(''); abortRef.current?.abort(); setStreaming(false); onStreamingChange?.(false); }}
+                className="px-3 py-1 text-sm border border-neon border-opacity-40 rounded-md hover:bg-neon hover:bg-opacity-10"
+                title="Clear history"
+              >
+                Clear
+              </button>
+              <button onClick={onClose} className="px-3 py-1 text-sm border border-neon border-opacity-40 rounded-md hover:bg-neon hover:bg-opacity-10">
+                Close
+              </button>
+            </div>
           </div>
           <div className="grid grid-cols-[1fr_auto] gap-4 items-start">
             <div className="min-h-[10rem] whitespace-pre-wrap text-sm space-y-3">
-              {history.map((m, i) => (
-                <div key={i} className={m.role === 'user' ? 'text-neon text-opacity-80' : ''}>
-                  <span className={m.role === 'user' ? 'text-neon' : 'text-neon text-opacity-70'}>
-                    {m.role === 'user' ? 'YOU>' : 'AI>'}
-                  </span>{' '}
-                  {m.content}
-                </div>
-              ))}
+              {history.map((m, i) => {
+                const isUser = m.role === 'user';
+                const isSystem = m.role === 'system';
+                return (
+                  <div key={i} className={isUser ? 'text-neon text-opacity-80' : isSystem ? 'text-white/70' : ''}>
+                    <span className={isUser ? 'text-neon' : isSystem ? 'text-white/50' : 'text-neon text-opacity-70'}>
+                      {isUser ? 'YOU>' : isSystem ? 'SYS>' : 'AI>'}
+                    </span>{' '}
+                    {m.content}
+                  </div>
+                );
+              })}
               {(streaming || typingFallback) && (
                 <div>
                   <span className="text-neon text-opacity-70">AI&gt;</span>{' '}

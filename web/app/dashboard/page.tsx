@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import Avatar from '@/components/Avatar';
 import ChatPanel from '@/components/ChatPanel';
@@ -20,14 +21,22 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-dvh p-6 md:p-10 space-y-8">
-      <header className="flex items-center justify-between">
+      <header className="flex items-center justify-between gap-3">
         <h2 className="font-pixel pixel-title text-neon text-2xl">Dashboard</h2>
-        <button
-          onClick={() => setChatOpen(true)}
-          className="px-4 py-2 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10 transition"
-        >
-          Open Chat
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/settings"
+            className="px-4 py-2 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10 transition"
+          >
+            Settings
+          </Link>
+          <button
+            onClick={() => setChatOpen(true)}
+            className="px-4 py-2 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10 transition"
+          >
+            Open Chat
+          </button>
+        </div>
       </header>
 
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">

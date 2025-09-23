@@ -40,3 +40,8 @@
 - 2025-09-20 PRテンプレート/Issueテンプレート(不具合, 機能要望, Chore)を追加。
 - 2025-09-20 docs に Web 版要件定義書(Dreamflow風)を追加（docs/WEB_REQUIREMENTS.md）。CLI 版定義からリンクを追記。
 - 2025-09-20 Web版雛形(Next.js+Tailwind+Framer Motion)を web/ に追加。タイトル/ダッシュボード/設定の骨組み、Avatar/Timer/Chatの最小実装を含む。
+- 2025-09-23 AI設定画面（AI名/口調、テーマ、ストリーム既定、遅延ms）実装のためブランチ feat/ai-settings-screen を作成。
+- 2025-09-23 Web設定画面を実装（AI名/口調、テーマ、ストリーム既定、遅延ms）。localStorage保存・テーマ反映の初期化コンポーネント追加。Chat/API を設定連動（no-stream対応）。
+- 2025-09-23 設定画面への導線を追加（HomeのContinue横、DashboardヘッダーのSettingsリンク）。
+- 2025-09-23 HomeのSettingsリンクを削除（Dashboardヘッダーのみ）。SettingsにAPIキー入力(Gemini/Supabase)を追加し、GeminiキーはチャットAPIで上書き可能に。
+- 2025-09-23 Chat改善: ヘッダーにClear追加、パネル閉鎖時に履歴クリア。systemメッセージをSYS>表示に変更。APIプロンプトに「毎回の挨拶不要」を追記。
