@@ -3,6 +3,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 type Preset = 'build-web' | 'lint-web' | 'test-repo' | 'echo';
 
+function isPreset(value: string): value is Preset {
+  return value === 'build-web' || value === 'lint-web' || value === 'test-repo' || value === 'echo';
+}
+
 export default function TerminalPanel() {
   // 日本語メモ: 単純な実行ログビュー（擬似ターミナル）。SSEでサーバーのspawn出力を受け取る。
   const [running, setRunning] = useState(false);
@@ -67,8 +71,9 @@ export default function TerminalPanel() {
           }
         }
       }
-    } catch (e: any) {
-      append(`\n[error] ${e?.message ?? 'unknown'}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'unknown';
+      append(`\n[error] ${message}`);
     } finally {
       setRunning(false);
       abortRef.current = null;
@@ -104,7 +109,10 @@ export default function TerminalPanel() {
           <select
             className="bg-bg border border-neon border-opacity-30 rounded-md text-sm px-2 py-1"
             value={preset}
-            onChange={(e) => setPreset(e.target.value as Preset)}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (isPreset(value)) setPreset(value);
+            }}
           >
             <option value="echo">Echo</option>
             <option value="build-web">Build (web)</option>
@@ -137,4 +145,3 @@ export default function TerminalPanel() {
     </div>
   );
 }
-

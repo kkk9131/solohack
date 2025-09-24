@@ -10,12 +10,13 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { title } = (await req.json()) as { title?: string };
-    if (!title || !title.trim()) return new Response('Title required', { status: 400 });
+    const body = await req.json();
+    const title = typeof body?.title === 'string' ? body.title.trim() : '';
+    if (!title) return new Response('Title required', { status: 400 });
     const task = await addTask(title);
     return Response.json({ task });
-  } catch (e: any) {
-    return new Response(e?.message ?? 'Bad Request', { status: 400 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Bad Request';
+    return new Response(message, { status: 400 });
   }
 }
-

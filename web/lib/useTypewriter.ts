@@ -10,6 +10,15 @@ type SoundOptions = {
   skipSpaces?: boolean; // 空白・改行では鳴らさない
 };
 
+type AudioContextConstructor = typeof AudioContext;
+
+function resolveAudioContext(): AudioContextConstructor | null {
+  if (typeof window === 'undefined') return null;
+  if (typeof window.AudioContext === 'function') return window.AudioContext;
+  const legacy = (window as typeof window & { webkitAudioContext?: AudioContextConstructor }).webkitAudioContext;
+  return typeof legacy === 'function' ? legacy : null;
+}
+
 export default function useTypewriter({
   delayMs = 40, // 非SSEで start(full) するときの速度
   paceMs = 0, // SSEで append(token) するときの速度（0は即時）
@@ -44,9 +53,9 @@ export default function useTypewriter({
     try {
       // 初回にAudioContextを作成
       if (!audioRef.current) {
-        const AC: any = (window as any).AudioContext || (window as any).webkitAudioContext;
-        if (!AC) return; // 未対応環境
-        audioRef.current = new AC();
+        const ctor = resolveAudioContext();
+        if (!ctor) return; // 未対応環境
+        audioRef.current = new ctor();
       }
       const ac = audioRef.current!;
       const osc = ac.createOscillator();

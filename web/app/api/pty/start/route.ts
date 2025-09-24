@@ -11,8 +11,8 @@ export async function POST(req: NextRequest) {
     const body = (await req.json().catch(() => ({}))) as { cwd?: string; cols?: number; rows?: number };
     const sess = createSession({ cwd: body.cwd, cols: body.cols ?? 80, rows: body.rows ?? 24 });
     return Response.json({ id: sess.id, cwd: sess.cwd });
-  } catch (e: any) {
-    return new Response(`Error: ${e?.message ?? 'unknown'}`, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'unknown';
+    return new Response(`Error: ${message}`, { status: 500 });
   }
 }
-

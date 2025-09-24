@@ -55,4 +55,18 @@ body {
 }
 .xterm .xterm-viewport, .xterm .xterm-screen, .xterm .xterm-helpers {
   background-color: var(--bg) !important; /* ensure dark background */
+  mix-blend-mode: normal;
+}
+.xterm .xterm-screen canvas {
+  mix-blend-mode: normal !important;
+  opacity: 1 !important;
+}
+.xterm .xterm-cursor,
+.xterm .xterm-cursor-block,
+.xterm .xterm-cursor-outline {
+  border-color: var(--neon) !important;
+}
+.xterm .xterm-cursor-block {
+  background-color: var(--neon) !important;
+  box-shadow: 0 0 6px var(--glow);
 }

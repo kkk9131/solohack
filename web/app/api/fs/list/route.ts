@@ -15,6 +15,13 @@ function isInside(base: string, target: string) {
   return t.startsWith(b);
 }
 
+type DirectoryEntry = {
+  name: string;
+  type: 'dir' | 'file';
+  size?: number;
+  mtimeMs: number;
+};
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -30,7 +37,7 @@ export async function GET(req: Request) {
       return new Response('Not a directory', { status: 400 });
     }
     const names = await fs.readdir(base);
-    const entries = await Promise.all(
+    const entries = await Promise.all<DirectoryEntry | null>(
       names
         .filter((n) => (showHidden ? true : !n.startsWith('.'))) // dotfiles除外（必要ならhidden=true）
         .filter((n) => n !== 'node_modules' && n !== '.git')
@@ -43,22 +50,21 @@ export async function GET(req: Request) {
               type: s.isDirectory() ? 'dir' : 'file',
               size: s.isDirectory() ? undefined : s.size,
               mtimeMs: s.mtimeMs,
-            };
+            } satisfies DirectoryEntry;
           } catch {
             return null;
           }
         }),
     );
-    const sorted = entries
-      .filter(Boolean) as { name: string; type: 'dir' | 'file'; size?: number; mtimeMs: number }[];
+    const sorted = entries.filter((entry): entry is DirectoryEntry => Boolean(entry));
     sorted.sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name) : a.type === 'dir' ? -1 : 1));
     return Response.json({
       root,
       path: path.relative(root, base) || '.',
       entries: sorted,
     });
-  } catch (e: any) {
-    return new Response(`Error: ${e?.message ?? 'unknown'}`, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'unknown';
+    return new Response(`Error: ${message}`, { status: 500 });
   }
 }
-

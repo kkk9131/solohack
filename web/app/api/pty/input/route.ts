@@ -16,8 +16,8 @@ export async function POST(req: NextRequest) {
     const data = body.data ?? '';
     sess.pty.write(data);
     return Response.json({ ok: true });
-  } catch (e: any) {
-    return new Response(`Error: ${e?.message ?? 'unknown'}`, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'unknown';
+    return new Response(`Error: ${message}`, { status: 500 });
   }
 }
-

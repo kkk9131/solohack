@@ -14,10 +14,11 @@ export default function DashboardPage() {
   const [avatarState, setAvatarState] = useState<'idle' | 'talk' | 'celebrate'>('idle');
   const [flash, setFlash] = useState(false);
   const tasksCtl = useTasksController();
+  const { refresh } = tasksCtl;
 
   // 初期ロード
   // 日本語メモ: 初回マウントでタスク取得。以降は操作時に refresh される。
-  useEffect(() => { tasksCtl.refresh(); }, [tasksCtl.refresh]);
+  useEffect(() => { refresh(); }, [refresh]);
 
   return (
     <main className="min-h-dvh p-6 md:p-10 space-y-8">
