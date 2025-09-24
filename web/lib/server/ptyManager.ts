@@ -35,7 +35,18 @@ export function createSession({ cwd, cols = 80, rows = 24 }: { cwd?: string; col
   const defaultShell = process.platform === 'win32' ? 'powershell.exe' : (process.platform === 'darwin' ? '/bin/zsh' : '/bin/bash');
   const shell = process.env.SHELL || defaultShell;
   const id = genId();
-  const env = { ...process.env, TERM: process.env.TERM || 'xterm-256color' } as any;
+  const env = {
+    ...process.env,
+    TERM: process.env.TERM || 'xterm-256color',
+    COLORTERM: process.env.COLORTERM || 'truecolor',
+    TERM_PROGRAM: process.env.TERM_PROGRAM || 'solohack',
+    TERM_PROGRAM_VERSION: process.env.TERM_PROGRAM_VERSION || 'dev',
+    FORCE_COLOR: process.env.FORCE_COLOR || '1',
+    // 日本語メモ: カラー有効化/互換性のために最低限の端末系ENVを明示
+  } as any;
+  // 任意: プロンプト上書き（zsh/bash）
+  if (process.env.SOLOHACK_PTY_PROMPT) env.PROMPT = process.env.SOLOHACK_PTY_PROMPT;
+  if (process.env.SOLOHACK_PTY_PS1) env.PS1 = process.env.SOLOHACK_PTY_PS1;
   const pty = spawn(shell, [], {
     name: 'xterm-color',
     cols,

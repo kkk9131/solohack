@@ -12,6 +12,9 @@ export async function GET(req: NextRequest) {
     const sess = id && getSession(id);
     if (!sess) return new Response('No session', { status: 404 });
     const encoder = new TextEncoder();
+    // 日本語メモ: ReadableStream の start() はコンストラクタ内で同期呼び出しされるため、
+    // その中で外側の const stream を参照するとTDZで落ちる。クリーンアップはクロージャ変数で持つ。
+    let cleanup: (() => void) | null = null;
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
         const send = (type: string, data: string) => controller.enqueue(encoder.encode(`${type ? `event: ${type}\n` : ''}data: ${data}\n\n`));
@@ -23,15 +26,13 @@ export async function GET(req: NextRequest) {
           try { dataDisp.dispose(); } catch {}
           try { exitDisp.dispose(); } catch {}
         });
-        // クライアントがSSEを切断した場合のクリーンアップ
-        // ReadableStream の cancel は呼ばれないケースがあるため、close時にも両方実施
-        (stream as any)._cleanup = () => {
+        cleanup = () => {
           try { dataDisp.dispose(); } catch {}
           try { exitDisp.dispose(); } catch {}
         };
       },
       cancel() {
-        try { (stream as any)._cleanup?.(); } catch {}
+        try { cleanup?.(); } catch {}
       },
     });
     const res = new Response(stream, {
@@ -42,7 +43,7 @@ export async function GET(req: NextRequest) {
       },
     });
     // @ts-ignore custom hook for cleanup on Node/Next response close (best-effort)
-    (res as any).on?.('close', () => { try { (stream as any)._cleanup?.(); } catch {} });
+    (res as any).on?.('close', () => { try { cleanup?.(); } catch {} });
     return res;
   } catch (e: any) {
     return new Response(`Error: ${e?.message ?? 'unknown'}`, { status: 500 });

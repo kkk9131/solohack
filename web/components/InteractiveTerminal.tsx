@@ -15,6 +15,9 @@ export default function InteractiveTerminal() {
   const [sessionId, setSessionId] = useState<string>('');
   const [running, setRunning] = useState(false);
   const [error, setError] = useState('');
+  // 日本語メモ: VSCode風操作向上（Clearボタン/ResizeObserver/詳細エラー）
+  const [scheme, setScheme] = useState<'neon' | 'one-dark' | 'solarized-dark' | 'monokai' | 'vscode-dark'>('neon');
+  const cssColorsRef = useRef<{ bg: string; neon: string }>({ bg: '#0b0f14', neon: '#00d8ff' });
 
   useEffect(() => {
     // エディタ背景（--bg）とネオン色（--neon）をCSS変数から取得
@@ -25,6 +28,9 @@ export default function InteractiveTerminal() {
       bg = (cs.getPropertyValue('--bg').trim() || bg);
       neon = (cs.getPropertyValue('--neon').trim() || neon);
     } catch {}
+    cssColorsRef.current = { bg, neon };
+
+    const theme = getTheme(scheme, cssColorsRef.current);
 
     const term = new Terminal({
       fontSize: 13,
@@ -34,24 +40,7 @@ export default function InteractiveTerminal() {
       allowTransparency: false,
       fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
       drawBoldTextInBrightColors: true as any,
-      theme: {
-        background: bg,
-        foreground: '#e5e7eb',
-        cursor: neon,
-        cursorAccent: bg,
-        selectionBackground: 'rgba(0, 216, 255, 0.25)',
-        // ANSI colors tuned for dark background visibility
-        black: '#9ca3af',
-        red: '#ff616e',
-        green: '#a3ff00',
-        yellow: '#f59e0b',
-        blue: neon,
-        magenta: '#ff00d8',
-        cyan: '#34d399',
-        white: '#e5e7eb',
-        brightBlack: '#cbd5e1',
-        brightWhite: '#ffffff',
-      },
+      theme,
     });
     const fit = new FitAddon();
     term.loadAddon(fit);
@@ -66,6 +55,8 @@ export default function InteractiveTerminal() {
       if (clientWidth <= 0 || clientHeight <= 0) { requestAnimationFrame(tryOpen); return; }
       try {
         term.open(el);
+        // 稀に初期テーマ適用が遅延する環境向けに再適用
+        try { (term as any).options = { ...term.options, theme }; } catch {}
         opened = true;
         // 初回は明示リサイズせず、描画安定後にfitは start() 側で実行
       } catch {
@@ -73,6 +64,17 @@ export default function InteractiveTerminal() {
       }
     };
     requestAnimationFrame(tryOpen);
+
+    // コンテナのサイズ変化に応じて自動フィット（VSCodeのように追従）
+    let ro: ResizeObserver | null = null;
+    try {
+      ro = new ResizeObserver(() => {
+        if (!sessionId) return; // 未起動時は無視
+        try { fit.fit(); } catch {}
+        void sendResize();
+      });
+      if (containerRef.current) ro.observe(containerRef.current);
+    } catch {}
 
     const onResize = () => {
       // セッション中のみfit（未起動時は何もしない）
@@ -83,10 +85,50 @@ export default function InteractiveTerminal() {
     window.addEventListener('resize', onResize);
     return () => {
       window.removeEventListener('resize', onResize);
+      try { ro?.disconnect(); } catch {}
       try { term.dispose(); } catch {}
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function getTheme(name: typeof scheme, base: { bg: string; neon: string }) {
+    switch (name) {
+      case 'one-dark':
+        return {
+          background: '#1e2127', foreground: '#abb2bf', cursor: '#528bff', cursorAccent: '#1e2127',
+          selectionBackground: 'rgba(82, 139, 255, 0.25)', black: '#5c6370', red: '#e06c75', green: '#98c379', yellow: '#d19a66', blue: '#61afef', magenta: '#c678dd', cyan: '#56b6c2', white: '#e6efff', brightBlack: '#7f848e', brightWhite: '#ffffff',
+        } as any;
+      case 'solarized-dark':
+        return {
+          background: '#002b36', foreground: '#93a1a1', cursor: '#b58900', cursorAccent: '#002b36',
+          selectionBackground: 'rgba(181, 137, 0, 0.25)', black: '#073642', red: '#dc322f', green: '#859900', yellow: '#b58900', blue: '#268bd2', magenta: '#d33682', cyan: '#2aa198', white: '#eee8d5', brightBlack: '#586e75', brightWhite: '#fdf6e3',
+        } as any;
+      case 'monokai':
+        return {
+          background: '#272822', foreground: '#f8f8f2', cursor: '#f8f8f0', cursorAccent: '#272822',
+          selectionBackground: 'rgba(248, 248, 242, 0.25)', black: '#75715e', red: '#f92672', green: '#a6e22e', yellow: '#f4bf75', blue: '#66d9ef', magenta: '#ae81ff', cyan: '#2AA198', white: '#f8f8f2', brightBlack: '#a1a08e', brightWhite: '#ffffff',
+        } as any;
+      case 'vscode-dark':
+        return {
+          background: '#1f1f1f', foreground: '#d4d4d4', cursor: '#aeafad', cursorAccent: '#1f1f1f',
+          selectionBackground: 'rgba(173, 214, 255, 0.25)', black: '#808080', red: '#f48771', green: '#50fa7b', yellow: '#f1fa8c', blue: '#61afef', magenta: '#ff79c6', cyan: '#8be9fd', white: '#f8f8f2', brightBlack: '#a9a9a9', brightWhite: '#ffffff',
+        } as any;
+      case 'neon':
+      default:
+        return {
+          background: base.bg, foreground: '#e5e7eb', cursor: base.neon, cursorAccent: base.bg,
+          selectionBackground: 'rgba(0, 216, 255, 0.25)', black: '#9ca3af', red: '#ff616e', green: '#a3ff00', yellow: '#f59e0b', blue: base.neon, magenta: '#ff00d8', cyan: '#34d399', white: '#e5e7eb', brightBlack: '#cbd5e1', brightWhite: '#ffffff',
+        } as any;
+    }
+  }
+
+  // スキーム変更で即時反映
+  useEffect(() => {
+    const term = termRef.current;
+    if (!term) return;
+    const theme = getTheme(scheme, cssColorsRef.current);
+    try { (term as any).options = { ...term.options, theme }; } catch {}
+  }, [scheme]);
 
   async function sendResize() {
     const term = termRef.current; const fit = fitRef.current;
@@ -106,6 +148,7 @@ export default function InteractiveTerminal() {
     try { await stop(); } catch {}
     const term = termRef.current!;
     term.reset();
+    try { term.writeln('\x1b[37m[terminal ready]\x1b[0m'); } catch {}
     // フィットしてから出力
     try { const fit = fitRef.current; fit && fit.fit(); } catch {}
     try {
@@ -131,6 +174,12 @@ export default function InteractiveTerminal() {
           const r = await fetch(`/api/pty/status?id=${encodeURIComponent(id)}`);
           if (!r.ok) {
             term.writeln(`\r\nstatus: ${r.status} ${r.statusText}`);
+            // 日本語メモ: 代表的な失敗理由をヒント表示
+            if (r.status === 403) {
+              term.writeln('\r\n\x1b[33mHint: PTYが無効です。web/.env.local に SOLOHACK_PTY_ENABLED=true を設定してサーバーを再起動してください。\x1b[0m');
+            } else if (r.status === 404) {
+              term.writeln('\r\n\x1b[33mHint: セッションが見つかりません。サーバーの再起動/ホットリロードでセッションが失われた可能性があります。Startを押して再接続してください。\x1b[0m');
+            }
           }
         } catch {}
         setRunning(false);
@@ -162,6 +211,11 @@ export default function InteractiveTerminal() {
     setRunning(false);
   }
 
+  function clear() {
+    const term = termRef.current;
+    try { (term as any)?.clear?.(); } catch {}
+  }
+
   return (
     <div className="hud-card p-3 space-y-3">
       <div className="flex items-center justify-between gap-3">
@@ -169,12 +223,28 @@ export default function InteractiveTerminal() {
           <div className="text-neon">Terminal (interactive)</div>
           <div className="text-xs text-white/60">Chromium 推奨。開発時は既定で有効。本番は SOLOHACK_PTY_ENABLED=true が必要。</div>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={running ? stop : start}
-            className="px-3 py-1.5 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10 text-sm"
-          >{running ? 'Stop' : 'Start'}</button>
-        </div>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={running ? stop : start}
+          className="px-3 py-1.5 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10 text-sm"
+        >{running ? 'Stop' : 'Start'}</button>
+        <button
+          onClick={clear}
+          className="px-3 py-1.5 border border-neon border-opacity-20 rounded-md text-white/80 hover:bg-neon hover:bg-opacity-10 text-sm"
+        >Clear</button>
+        <select
+          value={scheme}
+          onChange={(e) => setScheme(e.target.value as any)}
+          className="bg-bg border border-neon border-opacity-30 rounded-md text-xs px-2 py-1 text-white/80"
+          title="Color Theme"
+        >
+          <option value="neon">Neon</option>
+          <option value="vscode-dark">VSCode Dark</option>
+          <option value="one-dark">One Dark</option>
+          <option value="monokai">Monokai</option>
+          <option value="solarized-dark">Solarized Dark</option>
+        </select>
+      </div>
       </div>
       {error && <div className="text-xs text-red-400">{error}</div>}
       <div className="bg-bg border border-neon border-opacity-20 rounded-md p-1 min-h-[240px] max-h-[50vh] overflow-hidden">

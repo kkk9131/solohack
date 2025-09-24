@@ -48,3 +48,11 @@ body {
 .pixelated {
   image-rendering: pixelated;
 }
+
+/* 日本語メモ: xterm の前景/背景がテーマとズレて見えなくなる環境向けの保険。 */
+.xterm, .xterm .xterm-screen {
+  color: #e5e7eb !important; /* foreground fallback */
+}
+.xterm .xterm-viewport, .xterm .xterm-screen, .xterm .xterm-helpers {
+  background-color: var(--bg) !important; /* ensure dark background */
+}
