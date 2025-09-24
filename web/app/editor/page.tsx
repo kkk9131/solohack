@@ -4,7 +4,7 @@ import Link from 'next/link';
 import CodeEditor from '@/components/CodeEditor';
 import ChatPanel from '@/components/ChatPanel';
 import Avatar from '@/components/Avatar';
-import TerminalPanel from '@/components/TerminalPanel';
+// NOTE: Deprecated simple terminal panel removed in favor of InteractiveTerminal
 import dynamic from 'next/dynamic';
 const InteractiveTerminal = dynamic(() => import('@/components/InteractiveTerminal'), { ssr: false });
 
@@ -125,7 +125,16 @@ export default function EditorPage() {
   }
 
   // ---- Local (File System Access API) ----
-  const localSupported = typeof window !== 'undefined' && 'showDirectoryPicker' in window;
+  // 日本語メモ: SSRとクライアントの判定差によるHydration警告を避けるため、
+  // 初期値はfalseに固定し、マウント後に実際の対応可否を反映する
+  const [localSupported, setLocalSupported] = useState(false);
+  useEffect(() => {
+    try {
+      setLocalSupported(typeof window !== 'undefined' && 'showDirectoryPicker' in window);
+    } catch {
+      setLocalSupported(false);
+    }
+  }, []);
   const [localRoot, setLocalRoot] = useState<FileSystemDirectoryHandle | null>(null);
   const [localStack, setLocalStack] = useState<FileSystemDirectoryHandle[]>([]);
   const [localEntries, setLocalEntries] = useState<LocalEntry[]>([]);
@@ -388,7 +397,7 @@ export default function EditorPage() {
             onChange={setContent}
             height="70vh"
           />
-          <TerminalPanel />
+          {/* Interactive terminal only */}
           <InteractiveTerminal />
         </div>
       </section>

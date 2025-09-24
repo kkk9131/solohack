@@ -1,4 +1,4 @@
----
+ Avatar連動---
 name: 機能要望 (Feature Request)
 about: 新機能/改善の提案
 labels: feat

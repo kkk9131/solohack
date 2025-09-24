@@ -12,7 +12,14 @@ type Session = {
   cwd: string;
 };
 
-const sessions = new Map<string, Session>();
+// 日本語メモ: 開発中のホットリロードでモジュールが再評価されてもセッションを維持するため、
+// globalThis にセッションマップを格納する。
+declare global {
+  // eslint-disable-next-line no-var
+  var __SLH_PTY_SESSIONS__: Map<string, Session> | undefined;
+}
+const sessions: Map<string, Session> = (globalThis as any).__SLH_PTY_SESSIONS__ || new Map<string, Session>();
+(globalThis as any).__SLH_PTY_SESSIONS__ = sessions;
 
 function genId() {
   return Math.random().toString(36).slice(2, 10);
@@ -25,14 +32,27 @@ export function getRepoRoot() {
 
 export function createSession({ cwd, cols = 80, rows = 24 }: { cwd?: string; cols?: number; rows?: number }) {
   const repo = getRepoRoot();
-  const shell = process.env.SHELL || (process.platform === 'win32' ? 'powershell.exe' : '/bin/bash');
+  const defaultShell = process.platform === 'win32' ? 'powershell.exe' : (process.platform === 'darwin' ? '/bin/zsh' : '/bin/bash');
+  const shell = process.env.SHELL || defaultShell;
   const id = genId();
+  const env = {
+    ...process.env,
+    TERM: process.env.TERM || 'xterm-256color',
+    COLORTERM: process.env.COLORTERM || 'truecolor',
+    TERM_PROGRAM: process.env.TERM_PROGRAM || 'solohack',
+    TERM_PROGRAM_VERSION: process.env.TERM_PROGRAM_VERSION || 'dev',
+    FORCE_COLOR: process.env.FORCE_COLOR || '1',
+    // 日本語メモ: カラー有効化/互換性のために最低限の端末系ENVを明示
+  } as any;
+  // 任意: プロンプト上書き（zsh/bash）
+  if (process.env.SOLOHACK_PTY_PROMPT) env.PROMPT = process.env.SOLOHACK_PTY_PROMPT;
+  if (process.env.SOLOHACK_PTY_PS1) env.PS1 = process.env.SOLOHACK_PTY_PS1;
   const pty = spawn(shell, [], {
     name: 'xterm-color',
     cols,
     rows,
     cwd: cwd ? path.resolve(repo, cwd) : repo,
-    env: process.env as any,
+    env,
   });
   const sess: Session = { id, pty, createdAt: Date.now(), cwd: cwd ? path.resolve(repo, cwd) : repo };
   sessions.set(id, sess);
@@ -57,4 +77,3 @@ export function killSession(id: string) {
 export function listSessions() {
   return Array.from(sessions.values()).map((s) => ({ id: s.id, cwd: s.cwd, createdAt: s.createdAt }));
 }
-
