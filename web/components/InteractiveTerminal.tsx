@@ -31,7 +31,6 @@ export default function InteractiveTerminal() {
     cssColorsRef.current = { bg, neon };
 
     const theme = getTheme(scheme, cssColorsRef.current);
-
     const term = new Terminal({
       fontSize: 13,
       convertEol: true,
@@ -129,7 +128,6 @@ export default function InteractiveTerminal() {
     const theme = getTheme(scheme, cssColorsRef.current);
     try { (term as any).options = { ...term.options, theme }; } catch {}
   }, [scheme]);
-
   async function sendResize() {
     const term = termRef.current; const fit = fitRef.current;
     if (!term || !fit || !sessionId) return;
@@ -215,7 +213,6 @@ export default function InteractiveTerminal() {
     const term = termRef.current;
     try { (term as any)?.clear?.(); } catch {}
   }
-
   return (
     <div className="hud-card p-3 space-y-3">
       <div className="flex items-center justify-between gap-3">
@@ -223,28 +220,28 @@ export default function InteractiveTerminal() {
           <div className="text-neon">Terminal (interactive)</div>
           <div className="text-xs text-white/60">Chromium 推奨。開発時は既定で有効。本番は SOLOHACK_PTY_ENABLED=true が必要。</div>
         </div>
-      <div className="flex items-center gap-2">
-        <button
-          onClick={running ? stop : start}
-          className="px-3 py-1.5 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10 text-sm"
-        >{running ? 'Stop' : 'Start'}</button>
-        <button
-          onClick={clear}
-          className="px-3 py-1.5 border border-neon border-opacity-20 rounded-md text-white/80 hover:bg-neon hover:bg-opacity-10 text-sm"
-        >Clear</button>
-        <select
-          value={scheme}
-          onChange={(e) => setScheme(e.target.value as any)}
-          className="bg-bg border border-neon border-opacity-30 rounded-md text-xs px-2 py-1 text-white/80"
-          title="Color Theme"
-        >
-          <option value="neon">Neon</option>
-          <option value="vscode-dark">VSCode Dark</option>
-          <option value="one-dark">One Dark</option>
-          <option value="monokai">Monokai</option>
-          <option value="solarized-dark">Solarized Dark</option>
-        </select>
-      </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={running ? stop : start}
+            className="px-3 py-1.5 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10 text-sm"
+          >{running ? 'Stop' : 'Start'}</button>
+          <button
+            onClick={clear}
+            className="px-3 py-1.5 border border-neon border-opacity-20 rounded-md text-white/80 hover:bg-neon hover:bg-opacity-10 text-sm"
+          >Clear</button>
+          <select
+            value={scheme}
+            onChange={(e) => setScheme(e.target.value as any)}
+            className="bg-bg border border-neon border-opacity-30 rounded-md text-xs px-2 py-1 text-white/80"
+            title="Color Theme"
+          >
+            <option value="neon">Neon</option>
+            <option value="vscode-dark">VSCode Dark</option>
+            <option value="one-dark">One Dark</option>
+            <option value="monokai">Monokai</option>
+            <option value="solarized-dark">Solarized Dark</option>
+          </select>
+        </div>
       </div>
       {error && <div className="text-xs text-red-400">{error}</div>}
       <div className="bg-bg border border-neon border-opacity-20 rounded-md p-1 min-h-[240px] max-h-[50vh] overflow-hidden">
