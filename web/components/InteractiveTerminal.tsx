@@ -12,8 +12,8 @@ const DEFAULT_COLORS = { bg: '#0b0f14', neon: '#00d8ff' } as const;
 
 function readCssColors(): { bg: string; neon: string } {
   if (typeof document === 'undefined') return { ...DEFAULT_COLORS };
-  let bg = DEFAULT_COLORS.bg;
-  let neon = DEFAULT_COLORS.neon;
+  let bg: string = DEFAULT_COLORS.bg;
+  let neon: string = DEFAULT_COLORS.neon;
   try {
     const cs = getComputedStyle(document.documentElement);
     bg = (cs.getPropertyValue('--bg').trim() || bg);
@@ -171,6 +171,7 @@ export default function InteractiveTerminal() {
     term.reset();
     try { term.writeln('\x1b[37m[terminal ready]\x1b[0m'); } catch {}
     // フィットしてから出力
+    
     try {
       const fit = fitRef.current;
       if (fit) fit.fit();
