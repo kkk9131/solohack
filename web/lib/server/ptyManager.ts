@@ -45,30 +45,48 @@ export function getRepoRoot() {
   return path.resolve(env || path.resolve(process.cwd(), '..'));
 }
 
-export async function createSession({ cwd, cols = 80, rows = 24 }: { cwd?: string; cols?: number; rows?: number }) {
+export async function createSession({
+  cwd,
+  cols = 80,
+  rows = 24,
+  shell: customShell,
+  prompt: customPrompt
+}: {
+  cwd?: string;
+  cols?: number;
+  rows?: number;
+  shell?: string;
+  prompt?: string;
+}) {
   const repo = getRepoRoot();
+  // シェル選択（UI設定 > 環境変数 > デフォルト）
   const defaultShell = process.platform === 'win32' ? 'powershell.exe' : (process.platform === 'darwin' ? '/bin/zsh' : '/bin/bash');
-  const shell = process.env.SHELL || defaultShell;
+  const shell = customShell || process.env.SOLOHACK_PTY_SHELL || process.env.SHELL || defaultShell;
   const id = genId();
   const env: NodeJS.ProcessEnv = {
     ...process.env,
-    TERM: process.env.TERM || 'xterm-256color',
-    COLORTERM: process.env.COLORTERM || 'truecolor',
-    TERM_PROGRAM: process.env.TERM_PROGRAM || 'solohack',
-    TERM_PROGRAM_VERSION: process.env.TERM_PROGRAM_VERSION || 'dev',
-    FORCE_COLOR: process.env.FORCE_COLOR || '1',
-    // 日本語メモ: カラー有効化/互換性のために最低限の端末系ENVを明示
+    TERM: 'xterm-256color',
+    COLORTERM: 'truecolor',
+    TERM_PROGRAM: 'solohack',
+    TERM_PROGRAM_VERSION: 'dev',
+    FORCE_COLOR: '1',
+    // zsh設定: プロンプトを簡潔に、行末記号を削除
+    PROMPT_EOL_MARK: '',
+    // カスタムプロンプト（UI設定 > 環境変数 > デフォルト）
+    PS1: customPrompt || process.env.SOLOHACK_PTY_PS1 || (shell.includes('zsh') ? '%~ $ ' : '\\w$ '),
   };
   // 任意: プロンプト上書き（zsh/bash）
   if (process.env.SOLOHACK_PTY_PROMPT) env.PROMPT = process.env.SOLOHACK_PTY_PROMPT;
   if (process.env.SOLOHACK_PTY_PS1) env.PS1 = process.env.SOLOHACK_PTY_PS1;
   const { spawn } = await import('node-pty');
   const pty = spawn(shell, [], {
-    name: 'xterm-color',
+    name: 'xterm-256color',
     cols,
     rows,
     cwd: cwd ? path.resolve(repo, cwd) : repo,
     env,
+    // 出力フォーマットを改善
+    useConpty: false,
   });
   const sess: Session = { id, pty, createdAt: Date.now(), cwd: cwd ? path.resolve(repo, cwd) : repo };
   sessions.set(id, sess);
