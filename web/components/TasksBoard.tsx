@@ -150,9 +150,9 @@ export default function TasksBoard({
                   animate={{ opacity: 1, y: 0 }}
                   className="bg-bg border border-neon border-opacity-10 rounded p-2 text-sm flex items-center justify-between gap-2"
                   draggable
-                  onDragStart={(e) => handleDragStart(e, t.id)}
-                  onDragOver={handleDragOver}
-                  onDragEnd={handleDragEnd}
+                  onDragStart={(e) => handleDragStart(e as unknown as DragEvent<HTMLDivElement>, t.id)}
+                  onDragOver={(e) => handleDragOver(e as unknown as DragEvent<HTMLDivElement>)}
+                  onDragEnd={(e) => handleDragEnd(e as unknown as DragEvent<HTMLDivElement>)}
                 >
                   <div className="min-w-0">
                     <div className="truncate text-white/90">{t.title}</div>

@@ -7,6 +7,9 @@
   --hud: #0e1620;
   --neon: #00d8ff;
   --glow: rgba(0, 216, 255, 0.6);
+  /* 日本語メモ: オフラインビルド対応のフォント変数（next/fontを使わない既定値） */
+  --font-pixel: ui-monospace, Menlo, monospace;
+  --font-dot: ui-monospace, Menlo, monospace;
 }
 
 html, body {
