@@ -1,288 +1,464 @@
 "use client";
-import { useEffect, useRef, useState } from 'react';
-import { Terminal, type IDisposable, type ITheme } from '@xterm/xterm';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 
-// 日本語メモ: WebSocket ではなく SSE + REST で双方向を実現（入力はPOST、出力はSSE）。
-
-type TerminalScheme = 'neon' | 'one-dark' | 'solarized-dark' | 'monokai' | 'vscode-dark';
-
-const DEFAULT_COLORS = { bg: '#0b0f14', neon: '#00d8ff' } as const;
-
-function readCssColors(): { bg: string; neon: string } {
-  if (typeof document === 'undefined') return { ...DEFAULT_COLORS };
-  let bg: string = DEFAULT_COLORS.bg;
-  let neon: string = DEFAULT_COLORS.neon;
-  try {
-    const cs = getComputedStyle(document.documentElement);
-    bg = (cs.getPropertyValue('--bg').trim() || bg);
-    neon = (cs.getPropertyValue('--neon').trim() || neon);
-  } catch {}
-  return { bg, neon };
-}
-
 export default function InteractiveTerminal() {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const termRef = useRef<Terminal | null>(null);
-  const fitRef = useRef<FitAddon | null>(null);
-  const sseRef = useRef<EventSource | null>(null);
-  const dataListenerRef = useRef<IDisposable | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const terminalRef = useRef<Terminal | null>(null);
+  const fitAddonRef = useRef<FitAddon | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
+
   const [sessionId, setSessionId] = useState<string>('');
-  const [running, setRunning] = useState(false);
-  const [error, setError] = useState('');
-  // 日本語メモ: VSCode風操作向上（Clearボタン/ResizeObserver/詳細エラー）
-  const [scheme, setScheme] = useState<TerminalScheme>('neon');
-  const [cssColors, setCssColors] = useState<{ bg: string; neon: string }>(() => readCssColors());
+  const [isRunning, setIsRunning] = useState(false);
+  const [error, setError] = useState<string>('');
 
+  // ターミナル設定
+  const [selectedShell, setSelectedShell] = useState<string>('default');
+  const [selectedPromptType, setSelectedPromptType] = useState<string>('default');
+  const [customPrompt, setCustomPrompt] = useState<string>('');
+  const [showSettings, setShowSettings] = useState(false);
+
+  // 利用可能なシェルオプション
+  const shellOptions = [
+    { value: 'default', label: 'Default Shell' },
+    { value: '/bin/zsh', label: 'Zsh' },
+    { value: '/bin/bash', label: 'Bash' },
+    { value: '/bin/fish', label: 'Fish (if available)' },
+  ];
+
+  // プロンプトプリセット
+  const promptPresets = [
+    { value: 'default', label: 'Default', prompt: '' },
+    { value: 'simple', label: 'Simple ($)', prompt: '$ ' },
+    { value: 'arrow', label: 'Arrow (>)', prompt: '> ' },
+    { value: 'lambda', label: 'Lambda (λ)', prompt: 'λ ' },
+    { value: 'dir-bash', label: 'Directory (Bash)', prompt: '\\w$ ' },
+    { value: 'dir-zsh', label: 'Directory (Zsh)', prompt: '%~ $ ' },
+    { value: 'user-bash', label: 'User@Host (Bash)', prompt: '\\u@\\h:\\w$ ' },
+    { value: 'user-zsh', label: 'User@Host (Zsh)', prompt: '%n@%m:%~ $ ' },
+    { value: 'time-bash', label: 'Time + Dir (Bash)', prompt: '[\\t] \\w$ ' },
+    { value: 'time-zsh', label: 'Time + Dir (Zsh)', prompt: '[%T] %~ $ ' },
+    { value: 'custom', label: 'Custom', prompt: '' },
+  ];
+
+  // プロンプト選択時の処理
+  const handlePromptTypeChange = (value: string) => {
+    setSelectedPromptType(value);
+    const preset = promptPresets.find(p => p.value === value);
+    if (preset && value !== 'custom') {
+      setCustomPrompt(preset.prompt);
+    }
+  };
+
+  // 実際に使用するプロンプト
+  const getActivePrompt = () => {
+    if (selectedPromptType === 'custom') {
+      return customPrompt;
+    }
+    const preset = promptPresets.find(p => p.value === selectedPromptType);
+    return preset?.prompt || '';
+  };
+
+  // 設定の永続化
   useEffect(() => {
-    const initialColors = readCssColors();
-    setCssColors((prev) => (prev.bg === initialColors.bg && prev.neon === initialColors.neon ? prev : initialColors));
-    const theme = getTheme(scheme, initialColors);
-    const term = new Terminal({
-      fontSize: 13,
-      convertEol: true,
-      cursorBlink: true,
-      scrollback: 10000,
-      allowTransparency: false,
-      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-      drawBoldTextInBrightColors: true,
-      minimumContrastRatio: 7,
-      theme,
-    });
-    const fit = new FitAddon();
-    term.loadAddon(fit);
-    termRef.current = term;
-    fitRef.current = fit;
-    let opened = false;
-    const tryOpen = () => {
-      if (opened) return;
-      const el = containerRef.current;
-      if (!el) { requestAnimationFrame(tryOpen); return; }
-      const { clientWidth, clientHeight } = el;
-      if (clientWidth <= 0 || clientHeight <= 0) { requestAnimationFrame(tryOpen); return; }
-      try {
-        term.open(el);
-        // 日本語メモ: 一部ブラウザで初期描画が遅れるためオープン直後にもテーマとフィットを補正。
-        try { Object.assign(term.options, { theme }); } catch {}
-        try { fit.fit(); } catch {}
-        try { term.focus(); } catch {}
-        opened = true;
-      } catch {
-        requestAnimationFrame(tryOpen);
-      }
-    };
-    requestAnimationFrame(tryOpen);
+    const savedShell = localStorage.getItem('solohack-terminal-shell');
+    const savedPromptType = localStorage.getItem('solohack-terminal-prompt-type');
+    const savedCustomPrompt = localStorage.getItem('solohack-terminal-custom-prompt');
 
-    // CSS変数の変更を監視し、端末テーマも追随させる
-    let mo: MutationObserver | null = null;
-    try {
-      mo = new MutationObserver(() => {
-        const next = readCssColors();
-        setCssColors((prev) => (prev.bg === next.bg && prev.neon === next.neon ? prev : next));
-      });
-      mo.observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'class'] });
-    } catch {}
-
-    // コンテナのサイズ変化に応じて自動フィット（VSCodeのように追従）
-    let ro: ResizeObserver | null = null;
-    try {
-      ro = new ResizeObserver(() => {
-        if (!sessionId) return; // 未起動時は無視
-        try { fit.fit(); } catch {}
-        void sendResize();
-      });
-      if (containerRef.current) ro.observe(containerRef.current);
-    } catch {}
-
-    const onResize = () => {
-      if (!sessionId) return;
-      try { fit.fit(); } catch {}
-      void sendResize();
-    };
-    window.addEventListener('resize', onResize);
-    return () => {
-      window.removeEventListener('resize', onResize);
-      try { ro?.disconnect(); } catch {}
-      try { mo?.disconnect(); } catch {}
-      try { term.dispose(); } catch {}
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (savedShell) setSelectedShell(savedShell);
+    if (savedPromptType) setSelectedPromptType(savedPromptType);
+    if (savedCustomPrompt) setCustomPrompt(savedCustomPrompt);
   }, []);
 
-  function getTheme(name: TerminalScheme, base: { bg: string; neon: string }): ITheme {
-    switch (name) {
-      case 'one-dark':
-        return {
-          background: '#1e2127', foreground: '#abb2bf', cursor: '#528bff', cursorAccent: '#1e2127',
-          selectionBackground: 'rgba(82, 139, 255, 0.25)', black: '#5c6370', red: '#e06c75', green: '#98c379', yellow: '#d19a66', blue: '#61afef', magenta: '#c678dd', cyan: '#56b6c2', white: '#e6efff', brightBlack: '#7f848e', brightWhite: '#ffffff',
-        } satisfies ITheme;
-      case 'solarized-dark':
-        return {
-          background: '#002b36', foreground: '#93a1a1', cursor: '#b58900', cursorAccent: '#002b36',
-          selectionBackground: 'rgba(181, 137, 0, 0.25)', black: '#073642', red: '#dc322f', green: '#859900', yellow: '#b58900', blue: '#268bd2', magenta: '#d33682', cyan: '#2aa198', white: '#eee8d5', brightBlack: '#586e75', brightWhite: '#fdf6e3',
-        } satisfies ITheme;
-      case 'monokai':
-        return {
-          background: '#272822', foreground: '#f8f8f2', cursor: '#f8f8f0', cursorAccent: '#272822',
-          selectionBackground: 'rgba(248, 248, 242, 0.25)', black: '#75715e', red: '#f92672', green: '#a6e22e', yellow: '#f4bf75', blue: '#66d9ef', magenta: '#ae81ff', cyan: '#2AA198', white: '#f8f8f2', brightBlack: '#a1a08e', brightWhite: '#ffffff',
-        } satisfies ITheme;
-      case 'vscode-dark':
-        return {
-          background: '#1f1f1f', foreground: '#d4d4d4', cursor: '#aeafad', cursorAccent: '#1f1f1f',
-          selectionBackground: 'rgba(173, 214, 255, 0.25)', black: '#808080', red: '#f48771', green: '#50fa7b', yellow: '#f1fa8c', blue: '#61afef', magenta: '#ff79c6', cyan: '#8be9fd', white: '#f8f8f2', brightBlack: '#a9a9a9', brightWhite: '#ffffff',
-        } satisfies ITheme;
-      case 'neon':
-      default:
-        return {
-          background: base.bg, foreground: '#e5e7eb', cursor: base.neon, cursorAccent: base.bg,
-          selectionBackground: 'rgba(0, 216, 255, 0.25)', black: '#9ca3af', red: '#ff616e', green: '#a3ff00', yellow: '#f59e0b', blue: base.neon, magenta: '#ff00d8', cyan: '#34d399', white: '#e5e7eb', brightBlack: '#cbd5e1', brightWhite: '#ffffff',
-        } satisfies ITheme;
-    }
-  }
-
-  // 日本語メモ: テーマ/スキーム変更後は xterm テーマを即時再適用
   useEffect(() => {
-    const term = termRef.current;
-    if (!term) return;
-    const theme = getTheme(scheme, cssColors);
-    try {
-      Object.assign(term.options, { theme });
-      term.refresh(0, term.rows - 1);
-    } catch {}
-  }, [scheme, cssColors]);
-  async function sendResize() {
-    const term = termRef.current; const fit = fitRef.current;
-    if (!term || !fit || !sessionId) return;
-    try {
-      await fetch('/api/pty/resize', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: sessionId, cols: term.cols, rows: term.rows }),
-      });
-    } catch {}
-  }
+    localStorage.setItem('solohack-terminal-shell', selectedShell);
+  }, [selectedShell]);
 
-  async function start() {
-    if (running) return;
+  useEffect(() => {
+    localStorage.setItem('solohack-terminal-prompt-type', selectedPromptType);
+  }, [selectedPromptType]);
+
+  useEffect(() => {
+    localStorage.setItem('solohack-terminal-custom-prompt', customPrompt);
+  }, [customPrompt]);
+
+  // ターミナルの初期化
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    // xterm.jsのインスタンス作成
+    const terminal = new Terminal({
+      cols: 80,
+      rows: 24,
+      fontSize: 14,
+      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+      theme: {
+        background: '#0b0f14',
+        foreground: '#e5e7eb',
+        cursor: '#00d8ff',
+        cursorAccent: '#0b0f14',
+        selection: 'rgba(0, 216, 255, 0.3)',
+        black: '#000000',
+        red: '#ff5555',
+        green: '#50fa7b',
+        yellow: '#f1fa8c',
+        blue: '#00d8ff',
+        magenta: '#ff79c6',
+        cyan: '#8be9fd',
+        white: '#f8f8f2',
+        brightBlack: '#6272a4',
+        brightRed: '#ff6e67',
+        brightGreen: '#5af78e',
+        brightYellow: '#f4f99d',
+        brightBlue: '#00d8ff',
+        brightMagenta: '#ff92d0',
+        brightCyan: '#9aedfe',
+        brightWhite: '#e6e6e6',
+      },
+      cursorBlink: true,
+      scrollback: 5000,
+      // 重要: PTYを使う場合はconvertEolをfalseに
+      convertEol: false,
+      // スクロール設定
+      smoothScrollDuration: 125,
+      scrollSensitivity: 1,
+      fastScrollSensitivity: 5,
+    });
+
+    // FitAddonを追加
+    const fitAddon = new FitAddon();
+    terminal.loadAddon(fitAddon);
+
+    // ターミナルをDOMに接続
+    terminal.open(containerRef.current);
+
+    // 初期フィット
+    setTimeout(() => {
+      try {
+        fitAddon.fit();
+        terminal.focus();
+      } catch (e) {
+        console.error('Failed to fit terminal:', e);
+      }
+    }, 0);
+
+    terminalRef.current = terminal;
+    fitAddonRef.current = fitAddon;
+
+    // ウィンドウリサイズ対応
+    const handleResize = () => {
+      try {
+        fitAddon.fit();
+      } catch (e) {
+        console.error('Failed to fit on resize:', e);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+
+    // クリーンアップ
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      terminal.dispose();
+    };
+  }, []);
+
+  // PTYセッション開始
+  const startSession = useCallback(async () => {
+    if (isRunning || !terminalRef.current || !fitAddonRef.current) return;
+
+    const terminal = terminalRef.current;
+    const fitAddon = fitAddonRef.current;
+
     setError('');
-    // 既存の接続があれば安全に停止
-    try { await stop(); } catch {}
-    const term = termRef.current!;
-    term.reset();
-    try { term.writeln('\x1b[37m[terminal ready]\x1b[0m'); } catch {}
-    // フィットしてから出力
-    
+    // セッション停止時の処理を先に実行
+    await stopSession();
+
+    // ターミナルを完全にリセット
+    terminal.reset();
+    terminal.clear();
+
     try {
-      const fit = fitRef.current;
-      if (fit) fit.fit();
-    } catch {}
-    try {
-      const res = await fetch('/api/pty/start', {
+      // フィットしてから cols/rows を取得
+      fitAddon.fit();
+
+      // PTYセッション作成（設定を含む）
+      const activePrompt = getActivePrompt();
+      const sessionConfig = {
+        cols: terminal.cols,
+        rows: terminal.rows,
+        shell: selectedShell !== 'default' ? selectedShell : undefined,
+        prompt: activePrompt || undefined,
+      };
+
+      const response = await fetch('/api/pty/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cols: term.cols, rows: term.rows }),
+        body: JSON.stringify(sessionConfig),
       });
-      if (!res.ok) throw new Error(await res.text());
-      const { id } = await res.json();
+
+      if (!response.ok) {
+        throw new Error(`Failed to start PTY: ${response.statusText}`);
+      }
+
+      const { id } = await response.json();
       setSessionId(id);
-      // 既存のSSEを閉じてから新規接続
-      try { sseRef.current?.close(); } catch {}
-      const es = new EventSource(`/api/pty/stream?id=${encodeURIComponent(id)}`);
-      sseRef.current = es;
-      es.onopen = () => { setRunning(true); };
-      es.addEventListener('out', (e: MessageEvent) => {
-        term.write(e.data as string);
+
+      // SSE接続
+      const eventSource = new EventSource(`/api/pty/stream?id=${id}`);
+      eventSourceRef.current = eventSource;
+
+      // SSE: 出力データ受信
+      eventSource.addEventListener('out', (event) => {
+        const data = event.data;
+        // データが空でない場合のみ書き込み
+        if (data) {
+          terminal.write(data);
+        }
       });
-      es.addEventListener('exit', (e: MessageEvent) => {
-        term.writeln(`\r\n\x1b[33m[process exited ${e.data}]\x1b[0m`);
+
+      // SSE: プロセス終了
+      eventSource.addEventListener('exit', (event) => {
+        terminal.writeln(`\r\n\x1b[33m[Process exited with code ${event.data}]\x1b[0m`);
+        setIsRunning(false);
       });
-      es.addEventListener('error', async () => {
-        term.writeln('\r\n\x1b[31m[connection error]\x1b[0m');
-        try {
-          const r = await fetch(`/api/pty/status?id=${encodeURIComponent(id)}`);
-          if (!r.ok) {
-            term.writeln(`\r\nstatus: ${r.status} ${r.statusText}`);
-            // 日本語メモ: 代表的な失敗理由をヒント表示
-            if (r.status === 403) {
-              term.writeln('\r\n\x1b[33mHint: PTYが無効です。web/.env.local に SOLOHACK_PTY_ENABLED=true を設定してサーバーを再起動してください。\x1b[0m');
-            } else if (r.status === 404) {
-              term.writeln('\r\n\x1b[33mHint: セッションが見つかりません。サーバーの再起動/ホットリロードでセッションが失われた可能性があります。Startを押して再接続してください。\x1b[0m');
-            }
-          }
-        } catch {}
-        setRunning(false);
+
+      // SSE: エラー処理
+      eventSource.onerror = () => {
+        terminal.writeln('\r\n\x1b[31m[Connection lost]\x1b[0m');
+        setIsRunning(false);
+        eventSource.close();
+      };
+
+      // 入力処理: ターミナルへの入力をPTYに送信
+      const disposable = terminal.onData((data) => {
+        if (!id) return;
+
+        fetch('/api/pty/input', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, data }),
+        }).catch((err) => {
+          console.error('Failed to send input:', err);
+        });
       });
-      term.focus();
-      // 既存の onData をクリア（多重ハンドラで二重入力になるのを防止）
-      try { dataListenerRef.current?.dispose(); } catch {}
-      dataListenerRef.current = term.onData(async (d: string) => {
-        // NOTE: 状態の非同期更新に依存せず、確定した id を使用
-        try {
-          await fetch('/api/pty/input', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id, data: d }),
-          });
-        } catch {}
-      });
-      setRunning(true);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'failed to start';
+
+      // セッション開始時にdisposableを保存
+      (terminal as any)._inputDisposable = disposable;
+
+      setIsRunning(true);
+      terminal.focus();
+
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
       setError(message);
-      term.writeln(`\r\n\x1b[31m${message}\x1b[0m`);
+      terminal.writeln(`\r\n\x1b[31m[Error: ${message}]\x1b[0m`);
+      setIsRunning(false);
     }
-  }
+  }, [isRunning]);
 
-  async function stop() {
-    try {
-      const id = sessionId;
+  // PTYセッション停止
+  const stopSession = useCallback(async () => {
+    if (!isRunning && !sessionId) return;
+
+    // SSE接続を閉じる
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+
+    // 入力ハンドラを削除
+    const terminal = terminalRef.current;
+    if (terminal && (terminal as any)._inputDisposable) {
+      (terminal as any)._inputDisposable.dispose();
+      (terminal as any)._inputDisposable = null;
+    }
+
+    // PTYセッションを終了
+    if (sessionId) {
+      try {
+        await fetch('/api/pty/kill', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: sessionId }),
+        });
+      } catch (err) {
+        console.error('Failed to kill PTY session:', err);
+      }
       setSessionId('');
-      sseRef.current?.close();
-      sseRef.current = null;
-      try { dataListenerRef.current?.dispose(); } catch {}
-      dataListenerRef.current = null;
-      if (id) await fetch('/api/pty/kill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
-    } catch {}
-    setRunning(false);
-  }
+    }
 
-  function clear() {
-    const term = termRef.current;
-    try { term?.clear(); } catch {}
-  }
+    setIsRunning(false);
+
+    if (terminal) {
+      terminal.writeln('\r\n\x1b[33m[Session stopped]\x1b[0m');
+    }
+  }, [isRunning, sessionId]);
+
+  // ターミナルクリア
+  const clearTerminal = useCallback(() => {
+    if (terminalRef.current) {
+      terminalRef.current.clear();
+    }
+  }, []);
+
+  // リサイズ処理
+  const handleResize = useCallback(async () => {
+    if (!terminalRef.current || !fitAddonRef.current || !sessionId) return;
+
+    const terminal = terminalRef.current;
+    const fitAddon = fitAddonRef.current;
+
+    try {
+      fitAddon.fit();
+
+      // PTYにリサイズを通知
+      await fetch('/api/pty/resize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: sessionId,
+          cols: terminal.cols,
+          rows: terminal.rows,
+        }),
+      });
+    } catch (err) {
+      console.error('Failed to resize:', err);
+    }
+  }, [sessionId]);
+
+  // リサイズイベント監視
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      handleResize();
+    });
+
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [sessionId, handleResize]);
+
   return (
-    <div className="hud-card p-3 space-y-3">
-      <div className="flex items-center justify-between gap-3">
+    <div className="hud-card p-4 space-y-4">
+      <div className="flex items-center justify-between">
         <div>
-          <div className="text-neon">Terminal (interactive)</div>
-          <div className="text-xs text-white/60">Chromium 推奨。開発時は既定で有効。本番は SOLOHACK_PTY_ENABLED=true が必要。</div>
+          <h3 className="text-neon text-lg">Terminal</h3>
+          {error && (
+            <p className="text-red-500 text-sm mt-1">{error}</p>
+          )}
         </div>
-        <div className="flex items-center gap-2">
+
+        <div className="flex gap-2">
           <button
-            onClick={running ? stop : start}
-            className="px-3 py-1.5 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10 text-sm"
-          >{running ? 'Stop' : 'Start'}</button>
-          <button
-            onClick={clear}
-            className="px-3 py-1.5 border border-neon border-opacity-20 rounded-md text-white/80 hover:bg-neon hover:bg-opacity-10 text-sm"
-          >Clear</button>
-          <select
-            value={scheme}
-            onChange={(e) => setScheme(e.target.value as TerminalScheme)}
-            className="bg-bg border border-neon border-opacity-30 rounded-md text-xs px-2 py-1 text-white/80"
-            title="Color Theme"
+            onClick={isRunning ? stopSession : startSession}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              isRunning
+                ? 'bg-red-500 hover:bg-red-600 text-white'
+                : 'bg-neon hover:bg-neon/80 text-black'
+            }`}
           >
-            <option value="neon">Neon</option>
-            <option value="vscode-dark">VSCode Dark</option>
-            <option value="one-dark">One Dark</option>
-            <option value="monokai">Monokai</option>
-            <option value="solarized-dark">Solarized Dark</option>
-          </select>
+            {isRunning ? 'Stop' : 'Start'}
+          </button>
+
+          <button
+            onClick={clearTerminal}
+            className="px-4 py-2 rounded-md text-sm font-medium bg-gray-700 hover:bg-gray-600 text-white transition-colors"
+          >
+            Clear
+          </button>
+
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="px-4 py-2 rounded-md text-sm font-medium bg-gray-700 hover:bg-gray-600 text-white transition-colors"
+          >
+            Settings
+          </button>
         </div>
       </div>
-      {error && <div className="text-xs text-red-400">{error}</div>}
-      <div className="bg-bg border border-neon border-opacity-20 rounded-md p-1 min-h-[240px] max-h-[50vh] overflow-hidden">
-        <div ref={containerRef} className="h-[50vh]" />
+
+      {/* 設定パネル */}
+      {showSettings && (
+        <div className="bg-gray-800 rounded-lg p-4 border border-neon/20 space-y-4">
+          <h4 className="text-white font-medium">Terminal Settings</h4>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Shell
+              </label>
+              <select
+                value={selectedShell}
+                onChange={(e) => setSelectedShell(e.target.value)}
+                className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-neon focus:border-transparent"
+              >
+                {shellOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Prompt Style
+              </label>
+              <select
+                value={selectedPromptType}
+                onChange={(e) => handlePromptTypeChange(e.target.value)}
+                className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-neon focus:border-transparent"
+              >
+                {promptPresets.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* カスタムプロンプト入力（Customが選択された場合のみ表示） */}
+          {selectedPromptType === 'custom' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Custom Prompt String
+              </label>
+              <input
+                type="text"
+                value={customPrompt}
+                onChange={(e) => setCustomPrompt(e.target.value)}
+                placeholder="e.g., $ or \\w$ or %~ $ "
+                className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white placeholder-gray-400 focus:ring-2 focus:ring-neon focus:border-transparent"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Bash: \\u (user), \\h (host), \\w (dir) | Zsh: %n (user), %m (host), %~ (dir)
+              </p>
+              </div>
+          )}
+
+          <div className="text-xs text-gray-400">
+            <p>• Changes take effect when starting a new session</p>
+            <p>• Select appropriate prompt style for your shell (Bash/Zsh)</p>
+            <p>• Settings are saved in browser localStorage</p>
+          </div>
+        </div>
+      )}
+
+      <div
+        className="bg-black rounded-lg p-2 border border-neon/20"
+        style={{ height: '500px' }}
+      >
+        <div
+          ref={containerRef}
+          className="h-full w-full"
+        />
       </div>
     </div>
   );
