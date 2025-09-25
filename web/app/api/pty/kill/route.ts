@@ -13,8 +13,8 @@ export async function POST(req: NextRequest) {
     if (!id) return new Response('Missing id', { status: 400 });
     const ok = killSession(id);
     return Response.json({ ok });
-  } catch (e: any) {
-    return new Response(`Error: ${e?.message ?? 'unknown'}`, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'unknown';
+    return new Response(`Error: ${message}`, { status: 500 });
   }
 }
-

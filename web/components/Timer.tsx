@@ -9,6 +9,15 @@ type TimerState = {
 
 const STORAGE_KEY = 'slh_timer_state_v1';
 
+type AudioContextConstructor = typeof AudioContext;
+
+function getAudioContextCtor(): AudioContextConstructor | null {
+  if (typeof window === 'undefined') return null;
+  if (typeof window.AudioContext === 'function') return window.AudioContext;
+  const legacy = (window as typeof window & { webkitAudioContext?: AudioContextConstructor }).webkitAudioContext;
+  return typeof legacy === 'function' ? legacy : null;
+}
+
 export default function Timer({
   minutes = 25,
   onFinish,
@@ -113,7 +122,7 @@ export default function Timer({
         }
         return { ...s, remain: s.remain - 1 };
       });
-    }, 1000) as unknown as number;
+    }, 1000);
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -136,9 +145,9 @@ export default function Timer({
 
   // 簡易祝福SE（短い上昇メロディ）
   function playCelebrateSE() {
-    const AC: any = (window as any).AudioContext || (window as any).webkitAudioContext;
-    if (!AC) return;
-    const ac = new AC();
+    const AudioContextCtor = getAudioContextCtor();
+    if (!AudioContextCtor) return;
+    const ac = new AudioContextCtor();
     const notes = [880, 1047, 1319];
     const now = ac.currentTime;
     notes.forEach((f, i) => {
@@ -153,7 +162,9 @@ export default function Timer({
       gain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
       osc.start(t0); osc.stop(t0 + dur + 0.01);
     });
-    setTimeout(() => ac.close().catch(() => {}), 800);
+    window.setTimeout(() => {
+      void ac.close().catch(() => {});
+    }, 800);
   }
 
   return (

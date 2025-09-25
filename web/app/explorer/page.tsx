@@ -4,11 +4,15 @@ import { useEffect, useMemo, useState } from 'react';
 type Entry = { name: string; type: 'dir' | 'file'; size?: number; mtimeMs: number };
 
 // Local (File System Access API)
-type LocalEntry = {
-  name: string;
-  kind: 'directory' | 'file';
-  handle: FileSystemDirectoryHandle | FileSystemFileHandle;
-};
+type LocalEntry =
+  | { name: string; kind: 'directory'; handle: FileSystemDirectoryHandle }
+  | { name: string; kind: 'file'; handle: FileSystemFileHandle };
+
+declare global {
+  interface Window {
+    showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>;
+  }
+}
 
 export default function ExplorerPage() {
   // Server-backed workspace explorer
@@ -46,8 +50,9 @@ export default function ExplorerPage() {
       setRoot(data.root);
       setCwd(data.path || '.');
       setEntries(data.entries);
-    } catch (e: any) {
-      setError(e?.message ?? 'failed');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'failed';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -68,8 +73,9 @@ export default function ExplorerPage() {
       setPreview({ ...preview, content: editContent });
       setEditing(false);
       setTimeout(() => setSaveNote(''), 1500);
-    } catch (e: any) {
-      setSaveNote(e?.message ?? 'Failed to save');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to save';
+      setSaveNote(message);
     } finally {
       setSaving(false);
     }
@@ -101,13 +107,21 @@ export default function ExplorerPage() {
       const text = await res.text();
       const truncated = res.headers.get('X-Truncated') === 'true';
       setPreview({ path: p, content: text, truncated });
-    } catch (e: any) {
-      setPreview({ path: rel, content: `Error: ${e?.message ?? 'unknown'}`, truncated: false });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'unknown';
+      setPreview({ path: rel, content: `Error: ${message}`, truncated: false });
     }
   }
 
   // Local FS helpers
   const localSupported = typeof window !== 'undefined' && 'showDirectoryPicker' in window;
+
+  const localPath = useMemo(() => {
+    if (!localRoot) return '(not selected)';
+    if (localStack.length <= 1) return '/';
+    const segments = localStack.slice(1).map((handle) => handle.name);
+    return `/${segments.join('/')}`;
+  }, [localRoot, localStack]);
 
   async function localChoose() {
     setLocalError('');
@@ -117,14 +131,18 @@ export default function ExplorerPage() {
         setLocalError('File System Access API is not supported by this browser.');
         return;
       }
-      // @ts-expect-error: showDirectoryPicker exists in supporting browsers
-      const dir: FileSystemDirectoryHandle = await window.showDirectoryPicker();
+      if (!window.showDirectoryPicker) {
+        setLocalError('File System Access API is not supported by this browser.');
+        return;
+      }
+      const dir = await window.showDirectoryPicker();
       setLocalRoot(dir);
       setLocalStack([dir]);
       await loadLocal(dir);
-    } catch (e: any) {
-      if (e?.name === 'AbortError') return; // user canceled
-      setLocalError(e?.message ?? 'Failed to open folder');
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'AbortError') return; // user canceled
+      const message = err instanceof Error ? err.message : 'Failed to open folder';
+      setLocalError(message);
     }
   }
 
@@ -134,17 +152,20 @@ export default function ExplorerPage() {
     setLocalPreview(null);
     try {
       const items: LocalEntry[] = [];
-      // @ts-expect-error entries() async iterator is available
       for await (const [name, handle] of dir.entries()) {
         if (name.startsWith('.')) continue;
         if (name === 'node_modules' || name === '.git') continue;
-        const kind = (handle as any).kind as 'directory' | 'file';
-        items.push({ name, kind, handle: handle as any });
+        if (handle.kind === 'directory') {
+          items.push({ name, kind: 'directory', handle });
+        } else {
+          items.push({ name, kind: 'file', handle });
+        }
       }
       items.sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === 'directory' ? -1 : 1));
       setLocalEntries(items);
-    } catch (e: any) {
-      setLocalError(e?.message ?? 'Failed to read folder');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to read folder';
+      setLocalError(message);
     } finally {
       setLocalLoading(false);
     }
@@ -152,7 +173,7 @@ export default function ExplorerPage() {
 
   async function openLocal(entry: LocalEntry) {
     if (entry.kind !== 'directory') return;
-    const dir = entry.handle as FileSystemDirectoryHandle;
+    const dir = entry.handle;
     const next = [...localStack, dir];
     setLocalStack(next);
     await loadLocal(dir);
@@ -176,18 +197,26 @@ export default function ExplorerPage() {
   async function openLocalPreviewEntry(entry: LocalEntry) {
     if (entry.kind !== 'file') return;
     try {
-      const fh = entry.handle as FileSystemFileHandle;
+      const fh = entry.handle;
       setLocalFileHandle(fh);
       const file = await fh.getFile();
       const text = await file.text();
       const MAX = 100 * 1024;
       const content = text.length > MAX ? text.slice(0, MAX) : text;
       const truncated = text.length > MAX;
-      const rel = localStack.length > 1 ? localStack.slice(1).map((h: any) => h.name).concat(entry.name).join('/') : entry.name;
+      const rel =
+        localStack.length > 1
+          ? localStack
+              .slice(1)
+              .map((handle) => handle.name)
+              .concat(entry.name)
+              .join('/')
+          : entry.name;
       setLocalPreview({ path: `local:/${rel}`, content, truncated });
       setLocalEditing(false);
-    } catch (e: any) {
-      setLocalPreview({ path: entry.name, content: `Error: ${e?.message ?? 'unknown'}`, truncated: false });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'unknown';
+      setLocalPreview({ path: entry.name, content: `Error: ${message}`, truncated: false });
     }
   }
 
@@ -195,15 +224,16 @@ export default function ExplorerPage() {
     try {
       setLocalSaveNote('');
       if (!localPreview || !localFileHandle) return;
-      const writable = await (localFileHandle as any).createWritable();
+      const writable = await localFileHandle.createWritable();
       await writable.write(localEditContent);
       await writable.close();
       setLocalPreview({ ...localPreview, content: localEditContent });
       setLocalEditing(false);
       setLocalSaveNote('Saved');
       setTimeout(() => setLocalSaveNote(''), 1500);
-    } catch (e: any) {
-      setLocalSaveNote(e?.message ?? 'Failed to save');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to save';
+      setLocalSaveNote(message);
     }
   }
 
@@ -319,7 +349,7 @@ export default function ExplorerPage() {
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="hud-card p-4 lg:col-span-2">
           <div className="flex items-center justify-between mb-3">
-            <div className="text-neon">Local Folder: {localRoot ? (localStack.length > 1 ? localStack.slice(1).length : 0) ? `/${localStack.slice(1).map((h: any) => h.name).join('/')}` : '/' : '(not selected)'}</div>
+            <div className="text-neon">Local Folder: {localPath}</div>
             <div className="flex items-center gap-2">
               <button
                 onClick={localChoose}
@@ -345,7 +375,7 @@ export default function ExplorerPage() {
           ) : localError ? (
             <div className="text-red-400 text-sm">{localError}</div>
           ) : !localRoot ? (
-            <div className="text-white/50 text-sm">Click "Choose Folder" to explore a local directory (browser-only).</div>
+            <div className="text-white/50 text-sm">Click &quot;Choose Folder&quot; to explore a local directory (browser-only).</div>
           ) : (
             <ul className="divide-y divide-white/10">
               {localEntries.map((e) => (

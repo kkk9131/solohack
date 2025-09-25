@@ -1,8 +1,16 @@
 // 日本語メモ: PTY セッションを管理するサーバー専用の薄いマネージャ。
 // Next.js route の nodejs runtime からのみ参照されることを想定。
 
-import type { IPty } from 'node-pty';
-import { spawn } from 'node-pty';
+// 日本語メモ: node-pty はネイティブ拡張を含むため、ビルド環境での読み込みを避ける。
+// 動的importで実行時にのみ読み込む。
+type IDisposable = { dispose: () => void };
+type IPty = {
+  onData: (cb: (d: string) => void) => IDisposable;
+  onExit: (cb: (ev: { exitCode?: number; signal?: number }) => void) => IDisposable;
+  write: (data: string) => void;
+  resize: (cols: number, rows: number) => void;
+  kill: () => void;
+};
 import path from 'node:path';
 
 type Session = {
@@ -18,8 +26,15 @@ declare global {
   // eslint-disable-next-line no-var
   var __SLH_PTY_SESSIONS__: Map<string, Session> | undefined;
 }
-const sessions: Map<string, Session> = (globalThis as any).__SLH_PTY_SESSIONS__ || new Map<string, Session>();
-(globalThis as any).__SLH_PTY_SESSIONS__ = sessions;
+
+const globalWithSessions = globalThis as typeof globalThis & {
+  __SLH_PTY_SESSIONS__?: Map<string, Session>;
+};
+
+const sessions: Map<string, Session> =
+  globalWithSessions.__SLH_PTY_SESSIONS__ ?? new Map<string, Session>();
+
+globalWithSessions.__SLH_PTY_SESSIONS__ = sessions;
 
 function genId() {
   return Math.random().toString(36).slice(2, 10);
@@ -30,12 +45,12 @@ export function getRepoRoot() {
   return path.resolve(env || path.resolve(process.cwd(), '..'));
 }
 
-export function createSession({ cwd, cols = 80, rows = 24 }: { cwd?: string; cols?: number; rows?: number }) {
+export async function createSession({ cwd, cols = 80, rows = 24 }: { cwd?: string; cols?: number; rows?: number }) {
   const repo = getRepoRoot();
   const defaultShell = process.platform === 'win32' ? 'powershell.exe' : (process.platform === 'darwin' ? '/bin/zsh' : '/bin/bash');
   const shell = process.env.SHELL || defaultShell;
   const id = genId();
-  const env = {
+  const env: NodeJS.ProcessEnv = {
     ...process.env,
     TERM: process.env.TERM || 'xterm-256color',
     COLORTERM: process.env.COLORTERM || 'truecolor',
@@ -43,10 +58,11 @@ export function createSession({ cwd, cols = 80, rows = 24 }: { cwd?: string; col
     TERM_PROGRAM_VERSION: process.env.TERM_PROGRAM_VERSION || 'dev',
     FORCE_COLOR: process.env.FORCE_COLOR || '1',
     // 日本語メモ: カラー有効化/互換性のために最低限の端末系ENVを明示
-  } as any;
+  };
   // 任意: プロンプト上書き（zsh/bash）
   if (process.env.SOLOHACK_PTY_PROMPT) env.PROMPT = process.env.SOLOHACK_PTY_PROMPT;
   if (process.env.SOLOHACK_PTY_PS1) env.PS1 = process.env.SOLOHACK_PTY_PS1;
+  const { spawn } = await import('node-pty');
   const pty = spawn(shell, [], {
     name: 'xterm-color',
     cols,

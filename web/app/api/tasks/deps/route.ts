@@ -3,7 +3,9 @@ import { listTasks, upsertDependencies } from '@/lib/tasksStorage';
 
 export const runtime = 'nodejs';
 
-function buildDepsPrompt(tasks: { id: number; title: string }[]) {
+type TaskSummary = { id: number; title: string };
+
+function buildDepsPrompt(tasks: TaskSummary[]) {
   const catalog = tasks.map((t) => `- ${t.id}: ${t.title}`).join('\n');
   return [
     'You are a task dependency analyzer. Given a list of tasks (id and title),',
@@ -30,21 +32,43 @@ export async function POST() {
     const prompt = buildDepsPrompt(tasks);
     const result = await model.generateContent(prompt);
     const text = result.response.text();
-    let parsed: any = null;
-    try {
-      // NOTE: コードブロックで返る場合に備えて抽出
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(text);
-    } catch {
-      // 解析失敗時は空依存
-      parsed = { dependencies: {} };
-    }
-    const deps: Record<number, number[]> = Object.fromEntries(
-      Object.entries(parsed?.dependencies ?? {}).map(([k, v]) => [Number(k), Array.isArray(v) ? v.map((n: any) => Number(n)).filter((x: any) => Number.isFinite(x)) : []]),
-    );
+    const deps = parseDependenciesFromText(text);
     await upsertDependencies(deps);
     return Response.json({ dependencies: deps });
-  } catch (e: any) {
-    return new Response(e?.message ?? 'Error', { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Error';
+    return new Response(message, { status: 500 });
+  }
+}
+
+function parseDependenciesFromText(text: string): Record<number, number[]> {
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  const candidate = jsonMatch ? jsonMatch[0] : text;
+  try {
+    const parsed = JSON.parse(candidate) as { dependencies?: Record<string, unknown> };
+    if (!parsed || typeof parsed !== 'object') {
+      return {};
+    }
+    const dependencies = parsed.dependencies;
+    if (!dependencies || typeof dependencies !== 'object') {
+      return {};
+    }
+    const result: Record<number, number[]> = {};
+    for (const [key, value] of Object.entries(dependencies)) {
+      const taskId = Number(key);
+      if (!Number.isFinite(taskId)) continue;
+      if (!Array.isArray(value)) {
+        result[taskId] = [];
+        continue;
+      }
+      const normalized = value
+        .map((item) => Number(item))
+        .filter((dep): dep is number => Number.isFinite(dep));
+      const unique = Array.from(new Set(normalized)).filter((dep) => dep !== taskId);
+      result[taskId] = unique;
+    }
+    return result;
+  } catch {
+    return {};
   }
 }

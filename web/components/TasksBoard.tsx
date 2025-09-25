@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, type DragEvent } from 'react';
 import type { WebTask } from '@/lib/tasksStorage';
 import type { Status } from '@/lib/useTasksController';
 import { motion } from 'framer-motion';
@@ -78,6 +78,23 @@ export default function TasksBoard({
   const draggingIdRef = useRef<number | null>(null);
   const [hoverCol, setHoverCol] = useState<Status | null>(null);
 
+  const handleDragStart = (event: DragEvent<HTMLDivElement>, id: number) => {
+    draggingIdRef.current = id;
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', String(id));
+  };
+
+  const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDragEnd = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    draggingIdRef.current = null;
+    setHoverCol(null);
+  };
+
   function onDropTo(status: Status) {
     const id = draggingIdRef.current;
     draggingIdRef.current = null;
@@ -112,9 +129,9 @@ export default function TasksBoard({
           <div
             key={s}
             className={`bg-hud bg-opacity-60 border rounded-md p-3 transition-colors ${hoverCol===s ? 'border-neon border-opacity-40' : 'border-neon border-opacity-10'}`}
-            onDragOver={(e: React.DragEvent<HTMLDivElement>) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setHoverCol(s); }}
-            onDragLeave={(e: React.DragEvent<HTMLDivElement>) => { e.preventDefault(); setHoverCol((cur) => cur===s ? null : cur); }}
-            onDrop={(e: React.DragEvent<HTMLDivElement>) => {
+            onDragOver={(e: DragEvent<HTMLDivElement>) => { handleDragOver(e); setHoverCol(s); }}
+            onDragLeave={(e: DragEvent<HTMLDivElement>) => { e.preventDefault(); setHoverCol((cur) => (cur === s ? null : cur)); }}
+            onDrop={(e: DragEvent<HTMLDivElement>) => {
               e.preventDefault();
               const text = e.dataTransfer.getData('text/plain');
               const id = Number(text);
@@ -133,9 +150,9 @@ export default function TasksBoard({
                   animate={{ opacity: 1, y: 0 }}
                   className="bg-bg border border-neon border-opacity-10 rounded p-2 text-sm flex items-center justify-between gap-2"
                   draggable
-                  onDragStart={(e: any) => { draggingIdRef.current = t.id; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(t.id)); }}
-                  onDragOver={(e: any) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
-                  onDragEnd={(e: any) => { e.preventDefault(); draggingIdRef.current = null; setHoverCol(null); }}
+                  onDragStart={(e) => handleDragStart(e as unknown as DragEvent<HTMLDivElement>, t.id)}
+                  onDragOver={(e) => handleDragOver(e as unknown as DragEvent<HTMLDivElement>)}
+                  onDragEnd={(e) => handleDragEnd(e as unknown as DragEvent<HTMLDivElement>)}
                 >
                   <div className="min-w-0">
                     <div className="truncate text-white/90">{t.title}</div>

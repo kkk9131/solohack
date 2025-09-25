@@ -9,7 +9,15 @@ import dynamic from 'next/dynamic';
 const InteractiveTerminal = dynamic(() => import('@/components/InteractiveTerminal'), { ssr: false });
 
 type Entry = { name: string; type: 'dir' | 'file'; size?: number; mtimeMs: number };
-type LocalEntry = { name: string; kind: 'directory' | 'file'; handle: any };
+type LocalEntry =
+  | { name: string; kind: 'directory'; handle: FileSystemDirectoryHandle }
+  | { name: string; kind: 'file'; handle: FileSystemFileHandle };
+
+declare global {
+  interface Window {
+    showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>;
+  }
+}
 
 export default function EditorPage() {
   const [chatOpen, setChatOpen] = useState(false);
@@ -18,7 +26,6 @@ export default function EditorPage() {
   const [source, setSource] = useState<'workspace' | 'local' | null>(null); // 現在の編集中ソース
   // Explorer（ワークスペース側）
   const [cwd, setCwd] = useState<string>('.');
-  const [root, setRoot] = useState<string>('');
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
@@ -54,11 +61,11 @@ export default function EditorPage() {
       const res = await fetch(`/api/fs/list?p=${encodeURIComponent(dir)}`);
       if (!res.ok) throw new Error(await res.text());
       const data = (await res.json()) as { root: string; path: string; entries: Entry[] };
-      setRoot(data.root);
       setCwd(data.path || '.');
       setEntries(data.entries);
-    } catch (e: any) {
-      setError(e?.message ?? 'failed');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'failed';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -86,10 +93,11 @@ export default function EditorPage() {
       setOriginal(text);
       setSaveNote('');
       setSource('workspace');
-    } catch (e: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'unknown';
       setPath(rel);
-      setContent(`Error: ${e?.message ?? 'unknown'}`);
-      setOriginal(`Error: ${e?.message ?? 'unknown'}`);
+      setContent(`Error: ${message}`);
+      setOriginal(`Error: ${message}`);
     }
   }
 
@@ -106,15 +114,16 @@ export default function EditorPage() {
         });
         if (!res.ok) throw new Error(await res.text());
       } else if (source === 'local' && localFileHandle) {
-        const writable = await (localFileHandle as any).createWritable();
+        const writable = await localFileHandle.createWritable();
         await writable.write(content);
         await writable.close();
       }
       setOriginal(content);
       setSaveNote('Saved');
       setTimeout(() => setSaveNote(''), 1500);
-    } catch (e: any) {
-      setSaveNote(e?.message ?? 'Failed to save');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to save';
+      setSaveNote(message);
     } finally {
       setSaving(false);
     }
@@ -150,14 +159,18 @@ export default function EditorPage() {
         setLocalError('File System Access API is not supported by this browser.');
         return;
       }
-      // @ts-expect-error: showDirectoryPicker exists in supporting browsers
-      const dir: FileSystemDirectoryHandle = await window.showDirectoryPicker();
+      if (!window.showDirectoryPicker) {
+        setLocalError('File System Access API is not supported by this browser.');
+        return;
+      }
+      const dir = await window.showDirectoryPicker();
       setLocalRoot(dir);
       setLocalStack([dir]);
       await loadLocal(dir);
-    } catch (e: any) {
-      if (e?.name === 'AbortError') return; // user canceled
-      setLocalError(e?.message ?? 'Failed to open folder');
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'AbortError') return; // user canceled
+      const message = err instanceof Error ? err.message : 'Failed to open folder';
+      setLocalError(message);
     }
   }
 
@@ -166,17 +179,20 @@ export default function EditorPage() {
     setLocalError('');
     try {
       const items: LocalEntry[] = [];
-      // @ts-expect-error entries() async iterator is available
       for await (const [name, handle] of dir.entries()) {
         if (name.startsWith('.')) continue;
         if (name === 'node_modules' || name === '.git') continue;
-        const kind = (handle as any).kind as 'directory' | 'file';
-        items.push({ name, kind, handle: handle as any });
+        if (handle.kind === 'directory') {
+          items.push({ name, kind: 'directory', handle });
+        } else {
+          items.push({ name, kind: 'file', handle });
+        }
       }
       items.sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === 'directory' ? -1 : 1));
       setLocalEntries(items);
-    } catch (e: any) {
-      setLocalError(e?.message ?? 'Failed to read folder');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to read folder';
+      setLocalError(message);
     } finally {
       setLocalLoading(false);
     }
@@ -184,7 +200,7 @@ export default function EditorPage() {
 
   async function openLocal(entry: LocalEntry) {
     if (entry.kind !== 'directory') return;
-    const dir = entry.handle as FileSystemDirectoryHandle;
+    const dir = entry.handle;
     const next = [...localStack, dir];
     setLocalStack(next);
     await loadLocal(dir);
@@ -207,18 +223,27 @@ export default function EditorPage() {
   async function openLocalFileEntry(entry: LocalEntry) {
     if (entry.kind !== 'file') return;
     try {
-      const fh = entry.handle as FileSystemFileHandle;
+      if (entry.handle.kind !== 'file') return;
+      const fh = entry.handle;
       setLocalFileHandle(fh);
       const file = await fh.getFile();
       const text = await file.text();
-      const rel = localStack.length > 1 ? localStack.slice(1).map((h: any) => h.name).concat(entry.name).join('/') : entry.name;
+      const rel =
+        localStack.length > 1
+          ? localStack
+              .slice(1)
+              .map((handle) => handle.name)
+              .concat(entry.name)
+              .join('/')
+          : entry.name;
       setPath(`local:/${rel}`);
       setContent(text);
       setOriginal(text);
       setSaveNote('');
       setSource('local');
-    } catch (e: any) {
-      setLocalError(e?.message ?? 'Failed to open file');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to open file';
+      setLocalError(message);
     }
   }
 
@@ -345,7 +370,7 @@ export default function EditorPage() {
               ) : localError ? (
                 <div className="text-red-400 text-sm">{localError}</div>
               ) : !localRoot ? (
-                <div className="text-white/50 text-sm">Click "Choose" to select a local folder.</div>
+                <div className="text-white/50 text-sm">Click &quot;Choose&quot; to select a local folder.</div>
               ) : (
                 <ul className="divide-y divide-white/10">
                   {localEntries.map((e) => (

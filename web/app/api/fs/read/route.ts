@@ -31,7 +31,8 @@ export async function GET(req: Request) {
     return new Response(out, {
       headers: { 'Content-Type': 'text/plain; charset=utf-8', 'X-Truncated': String(truncated) },
     });
-  } catch (e: any) {
-    return new Response(`Error: ${e?.message ?? 'unknown'}`, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'unknown';
+    return new Response(`Error: ${message}`, { status: 500 });
   }
 }
