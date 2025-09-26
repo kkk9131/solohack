@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
+import TerminalStartupScreen from './TerminalStartupScreen';
 
 export default function InteractiveTerminal() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -13,6 +14,7 @@ export default function InteractiveTerminal() {
   const [sessionId, setSessionId] = useState<string>('');
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string>('');
+  const [showStartupScreen, setShowStartupScreen] = useState(false);
 
   // ターミナル設定
   const [selectedShell, setSelectedShell] = useState<string>('default');
@@ -90,16 +92,16 @@ export default function InteractiveTerminal() {
 
     // xterm.jsのインスタンス作成
     const terminal = new Terminal({
-      cols: 80,
-      rows: 24,
-      fontSize: 14,
-      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+      cols: 100,
+      rows: 30,
+      fontSize: 13,
+      fontFamily: 'ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, monospace',
       theme: {
         background: '#0b0f14',
         foreground: '#e5e7eb',
         cursor: '#00d8ff',
         cursorAccent: '#0b0f14',
-        selection: 'rgba(0, 216, 255, 0.3)',
+        selectionBackground: 'rgba(0, 216, 255, 0.3)',
         black: '#000000',
         red: '#ff5555',
         green: '#50fa7b',
@@ -118,13 +120,16 @@ export default function InteractiveTerminal() {
         brightWhite: '#e6e6e6',
       },
       cursorBlink: true,
-      scrollback: 5000,
-      // 重要: PTYを使う場合はconvertEolをfalseに
-      convertEol: false,
+      // 改行コードの変換を有効に（テキスト表示改善のため）
+      convertEol: true,
+      // 行の折り返し設定
+      wordWrap: true,
       // スクロール設定
-      smoothScrollDuration: 125,
-      scrollSensitivity: 1,
-      fastScrollSensitivity: 5,
+      smoothScrollDuration: 0, // 即座にスクロール
+      scrollSensitivity: 3,
+      fastScrollSensitivity: 10,
+      // スクロールバック設定
+      scrollback: 10000,
     });
 
     // FitAddonを追加
@@ -215,18 +220,28 @@ export default function InteractiveTerminal() {
         // データが空でない場合のみ書き込み
         if (data) {
           terminal.write(data);
+          // 新しいデータが来たら最下部にスクロール
+          setTimeout(() => {
+            terminal.scrollToBottom();
+          }, 10);
         }
       });
 
       // SSE: プロセス終了
       eventSource.addEventListener('exit', (event) => {
         terminal.writeln(`\r\n\x1b[33m[Process exited with code ${event.data}]\x1b[0m`);
+        setTimeout(() => {
+          terminal.scrollToBottom();
+        }, 10);
         setIsRunning(false);
       });
 
       // SSE: エラー処理
       eventSource.onerror = () => {
         terminal.writeln('\r\n\x1b[31m[Connection lost]\x1b[0m');
+        setTimeout(() => {
+          terminal.scrollToBottom();
+        }, 10);
         setIsRunning(false);
         eventSource.close();
       };
@@ -250,10 +265,18 @@ export default function InteractiveTerminal() {
       setIsRunning(true);
       terminal.focus();
 
+      // 初期化後に最下部にスクロール
+      setTimeout(() => {
+        terminal.scrollToBottom();
+      }, 100);
+
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       setError(message);
       terminal.writeln(`\r\n\x1b[31m[Error: ${message}]\x1b[0m`);
+      setTimeout(() => {
+        terminal.scrollToBottom();
+      }, 10);
       setIsRunning(false);
     }
   }, [isRunning]);
@@ -345,6 +368,21 @@ export default function InteractiveTerminal() {
     };
   }, [sessionId, handleResize]);
 
+  // Handle Start button click - show startup screen first
+  const handleStartClick = useCallback(() => {
+    if (isRunning) {
+      stopSession();
+    } else {
+      setShowStartupScreen(true);
+    }
+  }, [isRunning, stopSession]);
+
+  // Handle continuing from startup screen to actual terminal
+  const handleStartupContinue = useCallback(() => {
+    setShowStartupScreen(false);
+    startSession();
+  }, [startSession]);
+
   return (
     <div className="hud-card p-4 space-y-4">
       <div className="flex items-center justify-between">
@@ -357,7 +395,7 @@ export default function InteractiveTerminal() {
 
         <div className="flex gap-2">
           <button
-            onClick={isRunning ? stopSession : startSession}
+            onClick={handleStartClick}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               isRunning
                 ? 'bg-red-500 hover:bg-red-600 text-white'
@@ -452,13 +490,16 @@ export default function InteractiveTerminal() {
       )}
 
       <div
-        className="bg-black rounded-lg p-2 border border-neon/20"
-        style={{ height: '500px' }}
+        className="bg-black rounded-lg p-2 border border-neon/20 relative overflow-hidden"
+        style={{ height: '600px' }}
       >
         <div
           ref={containerRef}
-          className="h-full w-full"
+          className="h-full w-full overflow-auto"
         />
+        {showStartupScreen && (
+          <TerminalStartupScreen onContinue={handleStartupContinue} />
+        )}
       </div>
     </div>
   );
