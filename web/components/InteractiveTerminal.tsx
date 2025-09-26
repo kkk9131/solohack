@@ -1,20 +1,105 @@
 "use client";
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Terminal } from '@xterm/xterm';
+import type { IDisposable } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import TerminalStartupScreen from './TerminalStartupScreen';
+
+type CommandMemo = {
+  id: string;
+  title: string;
+  command: string;
+  description?: string;
+};
+
+type CommandMemoSession = {
+  id: string;
+  name: string;
+  commands: CommandMemo[];
+};
+
+const COMMAND_MEMO_STORAGE_KEY = 'solohack-terminal-command-memos';
+
+const SHELL_OPTIONS = [
+  { value: 'default', label: 'Default Shell' },
+  { value: '/bin/zsh', label: 'Zsh' },
+  { value: '/bin/bash', label: 'Bash' },
+  { value: '/bin/fish', label: 'Fish (if available)' },
+] as const;
+
+const PROMPT_PRESETS = [
+  { value: 'default', label: 'Default', prompt: '' },
+  { value: 'simple', label: 'Simple ($)', prompt: '$ ' },
+  { value: 'arrow', label: 'Arrow (>)', prompt: '> ' },
+  { value: 'lambda', label: 'Lambda (λ)', prompt: 'λ ' },
+  { value: 'dir-bash', label: 'Directory (Bash)', prompt: '\\w$ ' },
+  { value: 'dir-zsh', label: 'Directory (Zsh)', prompt: '%~ $ ' },
+  { value: 'user-bash', label: 'User@Host (Bash)', prompt: '\\u@\\h:\\w$ ' },
+  { value: 'user-zsh', label: 'User@Host (Zsh)', prompt: '%n@%m:%~ $ ' },
+  { value: 'time-bash', label: 'Time + Dir (Bash)', prompt: '[\\t] \\w$ ' },
+  { value: 'time-zsh', label: 'Time + Dir (Zsh)', prompt: '[%T] %~ $ ' },
+  { value: 'custom', label: 'Custom', prompt: '' },
+] as const;
+
+const DEFAULT_COMMAND_MEMO_SESSIONS: CommandMemoSession[] = [
+  {
+    id: 'memo-session-git',
+    name: 'Git Basics',
+    commands: [
+      {
+        id: 'memo-git-status',
+        title: 'Git Status',
+        command: 'git status',
+        description: 'Check the current working tree status.',
+      },
+      {
+        id: 'memo-git-pull',
+        title: 'Git Pull',
+        command: 'git pull',
+        description: 'Fetch and merge latest changes from the default remote.',
+      },
+      {
+        id: 'memo-git-add',
+        title: 'Git Add All',
+        command: 'git add .',
+        description: 'Stage all changes in the current repository.',
+      },
+      {
+        id: 'memo-git-commit',
+        title: 'Git Commit',
+        command: "git commit -m 'message'",
+        description: 'Commit staged changes with a message placeholder.',
+      },
+      {
+        id: 'memo-git-push',
+        title: 'Git Push',
+        command: 'git push',
+        description: 'Push local commits to the default remote branch.',
+      },
+    ],
+  },
+];
+
+const createId = (prefix: string) => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+  return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
+};
 
 export default function InteractiveTerminal() {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const inputDisposableRef = useRef<IDisposable | null>(null);
 
   const [sessionId, setSessionId] = useState<string>('');
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string>('');
   const [showStartupScreen, setShowStartupScreen] = useState(false);
+  const [showCommandMemo, setShowCommandMemo] = useState(false);
 
   // ターミナル設定
   const [selectedShell, setSelectedShell] = useState<string>('default');
@@ -22,48 +107,142 @@ export default function InteractiveTerminal() {
   const [customPrompt, setCustomPrompt] = useState<string>('');
   const [showSettings, setShowSettings] = useState(false);
 
-  // 利用可能なシェルオプション
-  const shellOptions = [
-    { value: 'default', label: 'Default Shell' },
-    { value: '/bin/zsh', label: 'Zsh' },
-    { value: '/bin/bash', label: 'Bash' },
-    { value: '/bin/fish', label: 'Fish (if available)' },
-  ];
-
-  // プロンプトプリセット
-  const promptPresets = [
-    { value: 'default', label: 'Default', prompt: '' },
-    { value: 'simple', label: 'Simple ($)', prompt: '$ ' },
-    { value: 'arrow', label: 'Arrow (>)', prompt: '> ' },
-    { value: 'lambda', label: 'Lambda (λ)', prompt: 'λ ' },
-    { value: 'dir-bash', label: 'Directory (Bash)', prompt: '\\w$ ' },
-    { value: 'dir-zsh', label: 'Directory (Zsh)', prompt: '%~ $ ' },
-    { value: 'user-bash', label: 'User@Host (Bash)', prompt: '\\u@\\h:\\w$ ' },
-    { value: 'user-zsh', label: 'User@Host (Zsh)', prompt: '%n@%m:%~ $ ' },
-    { value: 'time-bash', label: 'Time + Dir (Bash)', prompt: '[\\t] \\w$ ' },
-    { value: 'time-zsh', label: 'Time + Dir (Zsh)', prompt: '[%T] %~ $ ' },
-    { value: 'custom', label: 'Custom', prompt: '' },
-  ];
+  // コマンドメモ管理
+  const [commandMemoSessions, setCommandMemoSessions] = useState<CommandMemoSession[]>(DEFAULT_COMMAND_MEMO_SESSIONS);
+  const [activeMemoSessionId, setActiveMemoSessionId] = useState<string>(
+    DEFAULT_COMMAND_MEMO_SESSIONS[0]?.id ?? ''
+  );
+  const [newSessionName, setNewSessionName] = useState('');
+  const [newCommandTitle, setNewCommandTitle] = useState('');
+  const [newCommandValue, setNewCommandValue] = useState('');
+  const [newCommandDescription, setNewCommandDescription] = useState('');
 
   // プロンプト選択時の処理
-  const handlePromptTypeChange = (value: string) => {
+  const handlePromptTypeChange = useCallback((value: string) => {
     setSelectedPromptType(value);
-    const preset = promptPresets.find(p => p.value === value);
+    const preset = PROMPT_PRESETS.find((presetOption) => presetOption.value === value);
     if (preset && value !== 'custom') {
       setCustomPrompt(preset.prompt);
     }
-  };
+  }, []);
 
   // 実際に使用するプロンプト
-  const getActivePrompt = () => {
+  const getActivePrompt = useCallback(() => {
     if (selectedPromptType === 'custom') {
       return customPrompt;
     }
-    const preset = promptPresets.find(p => p.value === selectedPromptType);
+    const preset = PROMPT_PRESETS.find((presetOption) => presetOption.value === selectedPromptType);
     return preset?.prompt || '';
-  };
+  }, [selectedPromptType, customPrompt]);
 
-  // 設定の永続化
+  // コマンドメモ操作
+  const handleAddSession = useCallback(() => {
+    setCommandMemoSessions((prev) => {
+      const trimmed = newSessionName.trim();
+      const sessionId = createId('memo-session');
+      const sessionName = trimmed || `Session ${prev.length + 1}`;
+      const nextSessions = [
+        ...prev,
+        {
+          id: sessionId,
+          name: sessionName,
+          commands: [],
+        },
+      ];
+      setActiveMemoSessionId(sessionId);
+      return nextSessions;
+    });
+    setNewSessionName('');
+  }, [newSessionName]);
+
+  const handleDeleteSession = useCallback((sessionIdToRemove: string) => {
+    if (!sessionIdToRemove) {
+      return;
+    }
+    setCommandMemoSessions((prev) => {
+      if (prev.length <= 1) {
+        return prev;
+      }
+      const filtered = prev.filter((session) => session.id !== sessionIdToRemove);
+      if (filtered.length === prev.length) {
+        return prev;
+      }
+      if (activeMemoSessionId === sessionIdToRemove) {
+        setActiveMemoSessionId(filtered[0]?.id ?? '');
+      }
+      return filtered;
+    });
+  }, [activeMemoSessionId]);
+
+  const handleAddCommand = useCallback(() => {
+    const trimmedCommand = newCommandValue.trim();
+    if (!activeMemoSessionId || !trimmedCommand) {
+      return;
+    }
+    const trimmedTitle = newCommandTitle.trim();
+    const trimmedDescription = newCommandDescription.trim();
+    setCommandMemoSessions((prev) =>
+      prev.map((session) => {
+        if (session.id !== activeMemoSessionId) {
+          return session;
+        }
+        const newMemo: CommandMemo = {
+          id: createId('memo'),
+          title: trimmedTitle || trimmedCommand,
+          command: trimmedCommand,
+          description: trimmedDescription || undefined,
+        };
+        return {
+          ...session,
+          commands: [...session.commands, newMemo],
+        };
+      })
+    );
+    setNewCommandTitle('');
+    setNewCommandValue('');
+    setNewCommandDescription('');
+  }, [activeMemoSessionId, newCommandTitle, newCommandValue, newCommandDescription]);
+
+  const handleDeleteCommand = useCallback((commandId: string) => {
+    if (!activeMemoSessionId) {
+      return;
+    }
+    setCommandMemoSessions((prev) =>
+      prev.map((session) => {
+        if (session.id !== activeMemoSessionId) {
+          return session;
+        }
+        return {
+          ...session,
+          commands: session.commands.filter((command) => command.id !== commandId),
+        };
+      })
+    );
+  }, [activeMemoSessionId]);
+
+  // 日本語メモ: クリックしたメモコマンドを現在のPTYセッションへ送信する
+  const sendCommandToTerminal = useCallback(async (command: string) => {
+    if (!isRunning || !sessionId) {
+      setError('Start the terminal before running a command memo.');
+      return;
+    }
+    try {
+      await fetch('/api/pty/input', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: sessionId, data: `${command}\n` }),
+      });
+      terminalRef.current?.focus();
+    } catch (err) {
+      console.error('Failed to send memo command:', err);
+      setError('Failed to send command. Please check the console for details.');
+    }
+  }, [isRunning, sessionId]);
+
+  const handleRunMemoCommand = useCallback((command: string) => {
+    void sendCommandToTerminal(command);
+  }, [sendCommandToTerminal]);
+
   useEffect(() => {
     const savedShell = localStorage.getItem('solohack-terminal-shell');
     const savedPromptType = localStorage.getItem('solohack-terminal-prompt-type');
@@ -85,6 +264,42 @@ export default function InteractiveTerminal() {
   useEffect(() => {
     localStorage.setItem('solohack-terminal-custom-prompt', customPrompt);
   }, [customPrompt]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    try {
+      const storedSessions = localStorage.getItem(COMMAND_MEMO_STORAGE_KEY);
+      if (storedSessions) {
+        const parsed = JSON.parse(storedSessions) as CommandMemoSession[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setCommandMemoSessions(parsed);
+          setActiveMemoSessionId((current) => current || parsed[0]?.id || '');
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load command memos:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    // 日本語メモ: コマンドメモをローカルストレージへ保存して次回以降に復元できるようにする
+    localStorage.setItem(COMMAND_MEMO_STORAGE_KEY, JSON.stringify(commandMemoSessions));
+  }, [commandMemoSessions]);
+
+  useEffect(() => {
+    if (!commandMemoSessions.length) {
+      setActiveMemoSessionId('');
+      return;
+    }
+    if (!commandMemoSessions.some((session) => session.id === activeMemoSessionId)) {
+      setActiveMemoSessionId(commandMemoSessions[0].id);
+    }
+  }, [commandMemoSessions, activeMemoSessionId]);
 
   // ターミナルの初期化
   useEffect(() => {
@@ -169,26 +384,62 @@ export default function InteractiveTerminal() {
     };
   }, []);
 
+  // PTYセッション停止
+  const stopSession = useCallback(async () => {
+    if (!isRunning && !sessionId) {
+      return;
+    }
+
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+
+    if (inputDisposableRef.current) {
+      inputDisposableRef.current.dispose();
+      inputDisposableRef.current = null;
+    }
+
+    const terminal = terminalRef.current;
+
+    if (sessionId) {
+      try {
+        await fetch('/api/pty/kill', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: sessionId }),
+        });
+      } catch (err) {
+        console.error('Failed to kill PTY session:', err);
+      }
+      setSessionId('');
+    }
+
+    setIsRunning(false);
+
+    if (terminal) {
+      terminal.writeln('\r\n\x1b[33m[Session stopped]\x1b[0m');
+    }
+  }, [isRunning, sessionId]);
+
   // PTYセッション開始
   const startSession = useCallback(async () => {
-    if (isRunning || !terminalRef.current || !fitAddonRef.current) return;
+    if (isRunning || !terminalRef.current || !fitAddonRef.current) {
+      return;
+    }
 
     const terminal = terminalRef.current;
     const fitAddon = fitAddonRef.current;
 
     setError('');
-    // セッション停止時の処理を先に実行
     await stopSession();
 
-    // ターミナルを完全にリセット
     terminal.reset();
     terminal.clear();
 
     try {
-      // フィットしてから cols/rows を取得
       fitAddon.fit();
 
-      // PTYセッション作成（設定を含む）
       const activePrompt = getActivePrompt();
       const sessionConfig = {
         cols: terminal.cols,
@@ -210,25 +461,20 @@ export default function InteractiveTerminal() {
       const { id } = await response.json();
       setSessionId(id);
 
-      // SSE接続
       const eventSource = new EventSource(`/api/pty/stream?id=${id}`);
       eventSourceRef.current = eventSource;
 
-      // SSE: 出力データ受信
-      eventSource.addEventListener('out', (event) => {
+      eventSource.addEventListener('out', (event: MessageEvent<string>) => {
         const data = event.data;
-        // データが空でない場合のみ書き込み
         if (data) {
           terminal.write(data);
-          // 新しいデータが来たら最下部にスクロール
           setTimeout(() => {
             terminal.scrollToBottom();
           }, 10);
         }
       });
 
-      // SSE: プロセス終了
-      eventSource.addEventListener('exit', (event) => {
+      eventSource.addEventListener('exit', (event: MessageEvent<string>) => {
         terminal.writeln(`\r\n\x1b[33m[Process exited with code ${event.data}]\x1b[0m`);
         setTimeout(() => {
           terminal.scrollToBottom();
@@ -236,7 +482,6 @@ export default function InteractiveTerminal() {
         setIsRunning(false);
       });
 
-      // SSE: エラー処理
       eventSource.onerror = () => {
         terminal.writeln('\r\n\x1b[31m[Connection lost]\x1b[0m');
         setTimeout(() => {
@@ -246,9 +491,10 @@ export default function InteractiveTerminal() {
         eventSource.close();
       };
 
-      // 入力処理: ターミナルへの入力をPTYに送信
       const disposable = terminal.onData((data) => {
-        if (!id) return;
+        if (!id) {
+          return;
+        }
 
         fetch('/api/pty/input', {
           method: 'POST',
@@ -258,18 +504,14 @@ export default function InteractiveTerminal() {
           console.error('Failed to send input:', err);
         });
       });
-
-      // セッション開始時にdisposableを保存
-      (terminal as any)._inputDisposable = disposable;
+      inputDisposableRef.current = disposable;
 
       setIsRunning(true);
       terminal.focus();
 
-      // 初期化後に最下部にスクロール
       setTimeout(() => {
         terminal.scrollToBottom();
       }, 100);
-
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       setError(message);
@@ -279,45 +521,7 @@ export default function InteractiveTerminal() {
       }, 10);
       setIsRunning(false);
     }
-  }, [isRunning]);
-
-  // PTYセッション停止
-  const stopSession = useCallback(async () => {
-    if (!isRunning && !sessionId) return;
-
-    // SSE接続を閉じる
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
-
-    // 入力ハンドラを削除
-    const terminal = terminalRef.current;
-    if (terminal && (terminal as any)._inputDisposable) {
-      (terminal as any)._inputDisposable.dispose();
-      (terminal as any)._inputDisposable = null;
-    }
-
-    // PTYセッションを終了
-    if (sessionId) {
-      try {
-        await fetch('/api/pty/kill', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: sessionId }),
-        });
-      } catch (err) {
-        console.error('Failed to kill PTY session:', err);
-      }
-      setSessionId('');
-    }
-
-    setIsRunning(false);
-
-    if (terminal) {
-      terminal.writeln('\r\n\x1b[33m[Session stopped]\x1b[0m');
-    }
-  }, [isRunning, sessionId]);
+  }, [getActivePrompt, isRunning, selectedShell, stopSession]);
 
   // ターミナルクリア
   const clearTerminal = useCallback(() => {
@@ -383,6 +587,8 @@ export default function InteractiveTerminal() {
     startSession();
   }, [startSession]);
 
+  const activeMemoSession = commandMemoSessions.find((session) => session.id === activeMemoSessionId);
+
   return (
     <div className="hud-card p-4 space-y-4">
       <div className="flex items-center justify-between">
@@ -413,6 +619,13 @@ export default function InteractiveTerminal() {
           </button>
 
           <button
+            onClick={() => setShowCommandMemo((prev) => !prev)}
+            className="px-4 py-2 rounded-md text-sm font-medium bg-gray-700 hover:bg-gray-600 text-white transition-colors"
+          >
+            Command
+          </button>
+
+          <button
             onClick={() => setShowSettings(!showSettings)}
             className="px-4 py-2 rounded-md text-sm font-medium bg-gray-700 hover:bg-gray-600 text-white transition-colors"
           >
@@ -436,7 +649,7 @@ export default function InteractiveTerminal() {
                 onChange={(e) => setSelectedShell(e.target.value)}
                 className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-neon focus:border-transparent"
               >
-                {shellOptions.map((option) => (
+                {SHELL_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -453,7 +666,7 @@ export default function InteractiveTerminal() {
                 onChange={(e) => handlePromptTypeChange(e.target.value)}
                 className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-neon focus:border-transparent"
               >
-                {promptPresets.map((option) => (
+                {PROMPT_PRESETS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -497,6 +710,157 @@ export default function InteractiveTerminal() {
           ref={containerRef}
           className="h-full w-full overflow-auto"
         />
+        {showCommandMemo && (
+          <div className="pointer-events-none absolute inset-0 flex justify-end p-4">
+            <div className="pointer-events-auto flex w-80 flex-col overflow-hidden rounded-lg border border-neon/30 bg-gray-900/95 text-sm text-gray-200 shadow-lg backdrop-blur">
+              <div className="flex items-start justify-between gap-3 border-b border-neon/20 px-4 py-3">
+                <div>
+                  <p className="font-medium text-white">Command Memo</p>
+                  <p className="text-xs text-gray-400">Click command to send it to terminal.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowCommandMemo(false)}
+                  className="text-sm text-gray-400 transition hover:text-white"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="flex-1 space-y-4 overflow-y-auto px-4 py-3">
+                <div className="space-y-2">
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    Session
+                  </label>
+                  <select
+                    value={activeMemoSessionId}
+                    onChange={(event) => setActiveMemoSessionId(event.target.value)}
+                    className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white focus:border-transparent focus:outline-none focus:ring-2 focus:ring-neon"
+                  >
+                    {commandMemoSessions.map((session) => (
+                      <option key={session.id} value={session.id}>
+                        {session.name}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={newSessionName}
+                      onChange={(event) => setNewSessionName(event.target.value)}
+                      placeholder="New session name"
+                      className="flex-1 rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-neon"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddSession}
+                      className="rounded-md bg-neon px-3 py-2 text-sm font-medium text-black transition hover:bg-neon/80"
+                    >
+                      Add
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteSession(activeMemoSessionId)}
+                    disabled={commandMemoSessions.length <= 1}
+                    className="text-left text-xs text-gray-400 transition hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Delete current session
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    Saved Commands
+                  </p>
+                  {activeMemoSession && activeMemoSession.commands.length > 0 ? (
+                    activeMemoSession.commands.map((command) => (
+                      <div
+                        key={command.id}
+                        className="group relative rounded-md border border-gray-700 bg-gray-800/80 transition hover:border-neon/60"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleRunMemoCommand(command.command)}
+                          className="w-full rounded-md px-3 py-2 text-left pr-12"
+                        >
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-white">
+                              {command.title || command.command}
+                            </p>
+                            <span className="rounded-full bg-neon/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-neon">
+                              Run
+                            </span>
+                          </div>
+                          <p className="mt-1 break-words font-mono text-xs text-neon/90">
+                            {command.command}
+                          </p>
+                          {command.description && (
+                            <p className="mt-1 text-xs text-gray-400">
+                              {command.description}
+                            </p>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleDeleteCommand(command.id);
+                          }}
+                          className="absolute right-2 top-2 text-xs text-gray-500 transition hover:text-red-400"
+                          aria-label="Delete command"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="rounded-md border border-dashed border-gray-700 bg-gray-800/60 px-3 py-2 text-xs text-gray-400">
+                      No commands saved yet. Add one below to get started.
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2 border-t border-neon/10 pt-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    Add Command
+                  </p>
+                  <input
+                    type="text"
+                    value={newCommandTitle}
+                    onChange={(event) => setNewCommandTitle(event.target.value)}
+                    placeholder="Optional title (e.g., Git Status)"
+                    className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-neon"
+                  />
+                  <textarea
+                    value={newCommandValue}
+                    onChange={(event) => setNewCommandValue(event.target.value)}
+                    placeholder="Command to run (e.g., git status)"
+                    rows={2}
+                    className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-neon"
+                  />
+                  <input
+                    type="text"
+                    value={newCommandDescription}
+                    onChange={(event) => setNewCommandDescription(event.target.value)}
+                    placeholder="Notes (optional)"
+                    className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-neon"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddCommand}
+                    disabled={!activeMemoSessionId || !newCommandValue.trim()}
+                    className="w-full rounded-md bg-neon px-3 py-2 text-sm font-medium text-black transition hover:bg-neon/80 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Save Command
+                  </button>
+                </div>
+              </div>
+              <div className="border-t border-neon/20 px-4 py-2 text-xs text-gray-400">
+                Terminal session is {isRunning ? 'running' : 'stopped'}.
+              </div>
+            </div>
+          </div>
+        )}
         {showStartupScreen && (
           <TerminalStartupScreen onContinue={handleStartupContinue} />
         )}
