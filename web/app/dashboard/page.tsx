@@ -1,30 +1,35 @@
 "use client";
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
-import Avatar from '@/components/Avatar';
-import ChatPanel from '@/components/ChatPanel';
-import Timer from '@/components/Timer';
-import HUDProgress from '@/components/HUDProgress';
-import TasksBoard from '@/components/TasksBoard';
-import useTasksController from '@/lib/useTasksController';
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
+import Avatar from "@/components/Avatar";
+import ChatPanel from "@/components/ChatPanel";
+import Timer from "@/components/Timer";
+import HUDProgress from "@/components/HUDProgress";
+import TasksBoard from "@/components/TasksBoard";
+import DQMapMock from "@/components/DQMapMock";
+import useTasksController from "@/lib/useTasksController";
 
 export default function DashboardPage() {
   const [chatOpen, setChatOpen] = useState(false);
-  const [avatarState, setAvatarState] = useState<'idle' | 'talk' | 'celebrate'>('idle');
+  const [avatarState, setAvatarState] = useState<"idle" | "talk" | "celebrate">(
+    "idle",
+  );
   const [flash, setFlash] = useState(false);
   const tasksCtl = useTasksController();
   const { refresh } = tasksCtl;
 
-  // 初期ロード
-  // 日本語メモ: 初回マウントでタスク取得。以降は操作時に refresh される。
-  useEffect(() => { refresh(); }, [refresh]);
+  // 日本語メモ: 初回マウントでタスクを読み込み、以降は各操作で都度更新する。
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   return (
-    <main className="min-h-dvh p-6 md:p-10 space-y-8">
-      <header className="flex items-center justify-between gap-3">
+    <main className="min-h-dvh p-6 md:p-10 flex flex-col gap-8">
+      <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <h2 className="font-pixel pixel-title text-neon text-2xl">Dashboard</h2>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Link
             href="/editor"
             className="px-4 py-2 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10 transition"
@@ -52,52 +57,58 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="hud-card p-4 space-y-4">
-          <div className="flex items-center gap-3">
-            <Avatar state={avatarState} size={112} />
-            <div>
-              <div className="text-neon font-semibold">AI Partner</div>
-              <div className="text-xs text-neon text-opacity-70">Idle/Talk/Celebrate</div>
-            </div>
+      <section className="grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <div className="hud-card p-4 space-y-4 overflow-hidden">
+          <motion.h3 className="text-neon text-lg font-semibold">Tasks</motion.h3>
+          <div className="max-h-[28rem] overflow-y-auto pr-2">
+            <TasksBoard
+              tasks={tasksCtl.tasks}
+              loading={tasksCtl.loading}
+              analyzing={tasksCtl.analyzing}
+              add={tasksCtl.add}
+              del={tasksCtl.del}
+              setStatus={tasksCtl.setStatus}
+              analyzeDeps={tasksCtl.analyzeDeps}
+            />
           </div>
-          <HUDProgress value={tasksCtl.completion} />
         </div>
 
-        <div className="hud-card p-4 space-y-4 lg:col-span-2">
-          <motion.h3 className="text-neon">Timer</motion.h3>
+        <div className="hud-card p-4 space-y-5">
+          <div className="flex items-center justify-between">
+            <motion.h3 className="text-neon text-lg font-semibold">
+              Pomodoro
+            </motion.h3>
+            <div className="flex items-center gap-3">
+              <Avatar state={avatarState} size={96} />
+              <div className="text-right text-neon text-xs">
+                <div className="font-semibold text-sm">AI Partner</div>
+                <div className="text-neon text-opacity-70">Idle/Talk/Celebrate</div>
+              </div>
+            </div>
+          </div>
+
           <Timer
             minutes={25}
             onFinish={() => {
-              setAvatarState('celebrate');
+              setAvatarState("celebrate");
               setFlash(true);
-              setTimeout(() => setAvatarState('idle'), 1600);
+              setTimeout(() => setAvatarState("idle"), 1600);
               setTimeout(() => setFlash(false), 1000);
             }}
           />
+
+          <HUDProgress value={tasksCtl.completion} />
         </div>
       </section>
 
-      <section className="hud-card p-4">
-        <motion.h3 className="text-neon mb-4">Tasks</motion.h3>
-        <TasksBoard
-          tasks={tasksCtl.tasks}
-          loading={tasksCtl.loading}
-          analyzing={tasksCtl.analyzing}
-          add={tasksCtl.add}
-          del={tasksCtl.del}
-          setStatus={tasksCtl.setStatus}
-          analyzeDeps={tasksCtl.analyzeDeps}
-        />
-      </section>
+      <DQMapMock />
 
       <ChatPanel
         open={chatOpen}
         onClose={() => setChatOpen(false)}
-        onStreamingChange={(streaming) => setAvatarState(streaming ? 'talk' : 'idle')}
+        onStreamingChange={(streaming) => setAvatarState(streaming ? "talk" : "idle")}
       />
 
-      {/* 祝福フラッシュ演出（簡易） */}
       <AnimatePresence>
         {flash && (
           <motion.div
@@ -106,7 +117,7 @@ export default function DashboardPage() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.4 }}
             className="pointer-events-none fixed inset-0 bg-neon"
-            style={{ mixBlendMode: 'screen' }}
+            style={{ mixBlendMode: "screen" }}
           />
         )}
       </AnimatePresence>
