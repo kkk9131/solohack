@@ -7,6 +7,9 @@ import { promises as fs } from 'node:fs';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 
+export const MAP_NODE_KEYS = ['start', 'front', 'back', 'infra', 'release'] as const;
+export type MapNodeKey = (typeof MAP_NODE_KEYS)[number];
+
 export type WebTask = {
   id: number;
   title: string;
@@ -14,11 +17,21 @@ export type WebTask = {
   // 追加拡張（CLI非依存）：進行中フラグと依存関係
   inProgress?: boolean;
   deps?: number[]; // 依存するタスクID配列
+  mapNode?: MapNodeKey;
+};
+
+export type RequirementsMessage = { role: 'user' | 'ai' | 'system'; content: string };
+
+export type RequirementsSession = {
+  summary: string;
+  conversation: RequirementsMessage[];
+  updatedAt: string; // ISO8601
 };
 
 export type RepoData = {
   tasks: WebTask[];
   timer?: { startedAt: number; durationSeconds: number };
+  requirements?: RequirementsSession;
 };
 
 function getStoragePaths() {
@@ -29,6 +42,38 @@ function getStoragePaths() {
   return { dir, file };
 }
 
+function normalizeMessages(value: unknown): RequirementsMessage[] {
+  if (!Array.isArray(value)) return [];
+  const allowed = new Set<RequirementsMessage['role']>(['user', 'ai', 'system']);
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object') return undefined;
+      const record = entry as Record<string, unknown>;
+      const roleRaw = record.role;
+      const contentRaw = record.content;
+      const role = typeof roleRaw === 'string' && allowed.has(roleRaw as RequirementsMessage['role'])
+        ? (roleRaw as RequirementsMessage['role'])
+        : undefined;
+      const content = typeof contentRaw === 'string' ? contentRaw : '';
+      if (!role) return undefined;
+      const trimmed = content.trim();
+      if (!trimmed) return undefined;
+      return { role, content: content };
+    })
+    .filter((m): m is RequirementsMessage => Boolean(m));
+}
+
+function sanitizeRequirements(value: unknown): RequirementsSession | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const record = value as Record<string, unknown>;
+  const rawSummary = typeof record.summary === 'string' ? record.summary : '';
+  const summary = rawSummary.trim().length > 0 ? rawSummary : '';
+  const conversation = normalizeMessages(record.conversation);
+  const updatedAt = typeof record.updatedAt === 'string' ? record.updatedAt : new Date().toISOString();
+  if (!summary && conversation.length === 0) return undefined;
+  return { summary, conversation, updatedAt };
+}
+
 export async function loadData(): Promise<RepoData> {
   const { file } = getStoragePaths();
   try {
@@ -37,7 +82,11 @@ export async function loadData(): Promise<RepoData> {
     if (!raw.trim()) return { tasks: [] };
     const data = JSON.parse(raw) as RepoData;
     // NOTE: 想定外プロパティはそのまま維持（前方互換）
-    return { tasks: Array.isArray(data.tasks) ? data.tasks : [], timer: data.timer };
+    return {
+      tasks: Array.isArray(data.tasks) ? data.tasks : [],
+      timer: data.timer,
+      requirements: sanitizeRequirements(data.requirements),
+    };
   } catch {
     return { tasks: [] };
   }
@@ -48,7 +97,7 @@ export async function saveData(data: RepoData): Promise<void> {
   if (!existsSync(dir)) {
     await fs.mkdir(dir, { recursive: true });
   }
-  const payload = JSON.stringify({ tasks: data.tasks ?? [], timer: data.timer }, null, 2);
+  const payload = JSON.stringify({ tasks: data.tasks ?? [], timer: data.timer, requirements: data.requirements }, null, 2);
   await fs.writeFile(file, payload, 'utf8');
 }
 
@@ -74,6 +123,14 @@ export async function updateTask(id: number, patch: Partial<WebTask>): Promise<W
   if (idx < 0) throw new Error(`Task with id ${id} not found.`);
   const prev = d.tasks[idx];
   const next: WebTask = { ...prev, ...patch };
+  if (Object.prototype.hasOwnProperty.call(patch, 'mapNode')) {
+    const normalized = normalizeMapNode((patch as Record<string, unknown>).mapNode);
+    if (normalized) {
+      next.mapNode = normalized;
+    } else {
+      delete next.mapNode;
+    }
+  }
   d.tasks[idx] = next;
   await saveData(d);
   return next;
@@ -87,18 +144,71 @@ export async function removeTask(id: number): Promise<void> {
   await saveData(d);
 }
 
-export async function upsertDependencies(depsMap: Record<number, number[]>) {
-  // 日本語メモ: 依存関係の一括適用。存在しないIDは無視。
-  const d = await loadData();
-  const byId = new Map<number, WebTask>((d.tasks ?? []).map((t) => [t.id, t]));
-  for (const [idStr, deps] of Object.entries(depsMap)) {
-    const id = Number(idStr);
-    const t = byId.get(id);
-    if (!t) continue;
-    t.deps = Array.isArray(deps) ? deps.filter((v) => byId.has(v) && v !== id) : [];
-  }
-  d.tasks = Array.from(byId.values());
-  await saveData(d);
-  return d.tasks;
+export type GeneratedTaskSeed = {
+  title: string;
+  mapNode?: unknown;
+};
+
+function normalizeMapNode(value: unknown): MapNodeKey | undefined {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim().toLowerCase();
+  return MAP_NODE_KEYS.find((key) => key === normalized);
 }
 
+function sanitizeGeneratedSeeds(seeds: GeneratedTaskSeed[]): Array<{ title: string; mapNode?: MapNodeKey }> {
+  return seeds
+    .map((seed) => {
+      const title = typeof seed.title === 'string' ? seed.title.trim() : '';
+      if (!title) return undefined;
+      const mapNode = normalizeMapNode(seed.mapNode) ?? undefined;
+      return { title, mapNode };
+    })
+    .filter((item): item is { title: string; mapNode?: MapNodeKey } => Boolean(item));
+}
+
+export async function replaceTasksWithGenerated(seeds: GeneratedTaskSeed[]) {
+  const sanitized = sanitizeGeneratedSeeds(seeds);
+  if (sanitized.length === 0) {
+    throw new Error('No valid tasks to save');
+  }
+  const data = await loadData();
+  const tasks: WebTask[] = sanitized.map((seed, index) => ({
+    id: index + 1,
+    title: seed.title,
+    completed: false,
+    inProgress: false,
+    deps: [],
+    mapNode: seed.mapNode ?? MAP_NODE_KEYS[0],
+  }));
+  data.tasks = tasks;
+  await saveData(data);
+  return tasks;
+}
+
+export async function getRequirements(): Promise<RequirementsSession | null> {
+  const d = await loadData();
+  return d.requirements ?? null;
+}
+
+export async function saveRequirementsSession(input: {
+  summary: string;
+  conversation: RequirementsMessage[];
+}): Promise<RequirementsSession> {
+  const summary = typeof input.summary === 'string' ? input.summary : '';
+  if (!summary.trim()) {
+    throw new Error('Requirements summary is required.');
+  }
+  const conversation = normalizeMessages(input.conversation);
+  if (conversation.length === 0) {
+    throw new Error('Conversation log is required.');
+  }
+  const session: RequirementsSession = {
+    summary,
+    conversation,
+    updatedAt: new Date().toISOString(),
+  };
+  const data = await loadData();
+  data.requirements = session;
+  await saveData(data);
+  return session;
+}

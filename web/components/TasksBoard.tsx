@@ -1,82 +1,43 @@
 "use client";
 import { useMemo, useRef, useState, type DragEvent } from 'react';
 import type { WebTask } from '@/lib/tasksStorage';
-import type { Status } from '@/lib/useTasksController';
+import type { RoadmapStage, Status } from '@/lib/useTasksController';
 import { motion } from 'framer-motion';
-
-function statusOf(t: WebTask): Status {
-  if (t.completed) return 'done';
-  return t.inProgress ? 'in-progress' : 'todo';
-}
-
-function groupByStatus(tasks: WebTask[]) {
-  const groups: Record<Status, WebTask[]> = { 'todo': [], 'in-progress': [], 'done': [] };
-  for (const t of tasks) groups[statusOf(t)].push(t);
-  return groups;
-}
-
-function topoGroups(tasks: WebTask[]): WebTask[][] {
-  // 日本語メモ: 依存関係の層（ステージ）に分割。循環は最後の層に押し出し。
-  const byId = new Map<number, WebTask>(tasks.map((t) => [t.id, t]));
-  const incoming = new Map<number, Set<number>>();
-  const outgoing = new Map<number, Set<number>>();
-  for (const t of tasks) {
-    const deps = (t.deps ?? []).filter((d) => byId.has(d) && d !== t.id);
-    incoming.set(t.id, new Set(deps));
-    for (const d of deps) {
-      if (!outgoing.has(d)) outgoing.set(d, new Set());
-      outgoing.get(d)!.add(t.id);
-    }
-  }
-  const layers: WebTask[][] = [];
-  const remaining = new Set(tasks.map((t) => t.id));
-  while (remaining.size > 0) {
-    const layer: number[] = [];
-    for (const id of Array.from(remaining)) {
-      if ((incoming.get(id)?.size ?? 0) === 0) layer.push(id);
-    }
-    if (layer.length === 0) {
-      // 循環 or 残り: まとめて最後の層
-      const rest = Array.from(remaining);
-      layers.push(rest.map((id) => byId.get(id)!).filter(Boolean));
-      break;
-    }
-    layers.push(layer.map((id) => byId.get(id)!).filter(Boolean));
-    for (const id of layer) {
-      remaining.delete(id);
-      for (const to of Array.from(outgoing.get(id) ?? [])) {
-        const inc = incoming.get(to);
-        if (inc) inc.delete(id);
-      }
-    }
-  }
-  return layers;
-}
+import { dependencyLayers, groupByStatus } from '@/lib/taskGrouping';
 
 export default function TasksBoard({
   tasks,
   loading,
-  analyzing,
+  generating,
   add,
   del,
   setStatus,
-  analyzeDeps,
+  generatePlan,
+  roadmap,
 }: {
   tasks: WebTask[];
   loading: boolean;
-  analyzing: boolean;
+  generating: boolean;
   add: (title: string) => Promise<void> | void;
   del: (id: number) => Promise<void> | void;
   setStatus: (id: number, status: Status) => Promise<void> | void;
-  analyzeDeps: () => Promise<void> | void;
+  generatePlan: () => Promise<void> | void;
+  roadmap: RoadmapStage[];
 }) {
   const [title, setTitle] = useState('');
   const groups = useMemo(() => groupByStatus(tasks), [tasks]);
-  const layers = useMemo(() => topoGroups(tasks), [tasks]);
+  const layers = useMemo(() => dependencyLayers(tasks), [tasks]);
 
   // DnD: ドラッグ中のIDと見た目ハイライト制御
   const draggingIdRef = useRef<number | null>(null);
   const [hoverCol, setHoverCol] = useState<Status | null>(null);
+  const roadmapLabels: Record<string, string> = {
+    start: 'はじまり',
+    front: 'フロント',
+    back: 'バックエンド',
+    infra: 'インフラ',
+    release: 'リリース',
+  };
 
   const handleDragStart = (event: DragEvent<HTMLDivElement>, id: number) => {
     draggingIdRef.current = id;
@@ -106,7 +67,7 @@ export default function TasksBoard({
   return (
     <div className="space-y-4">
       {/* 追加フォーム */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <input
           className="flex-1 bg-bg text-white/90 placeholder:text-white/40 border border-neon border-opacity-20 rounded-md px-3 py-2 focus:outline-none focus:border-opacity-40"
           placeholder="Add a task"
@@ -117,10 +78,10 @@ export default function TasksBoard({
         <button className="px-3 py-2 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10" onClick={async () => { const t = title; setTitle(''); await add(t); }}>Add</button>
         <button
           className="px-3 py-2 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10 disabled:opacity-50"
-          onClick={analyzeDeps}
-          disabled={analyzing || loading || tasks.length === 0}
-          title="AIで依存関係を推定して保存"
-        >Analyze Dependencies</button>
+          onClick={generatePlan}
+          disabled={generating || loading}
+          title="要件サマリーからタスクとロードマップを再生成"
+        >Generate Plan</button>
       </div>
 
       {/* カンバン */}
@@ -197,6 +158,40 @@ export default function TasksBoard({
                     <div key={t.id} className="bg-bg border border-neon/10 rounded px-2 py-1 text-xs text-white/90 truncate">{t.title}</div>
                   ))}
                 </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4">
+        <div className="text-neon text-sm font-semibold mb-2">ロードマップ候補</div>
+        {generating ? (
+          <div className="text-xs text-neon text-opacity-60">AIがロードマップを生成中...</div>
+        ) : roadmap.length === 0 ? (
+          <div className="text-xs text-neon text-opacity-60">生成済みのロードマップがありません。</div>
+        ) : (
+          <div className="space-y-2">
+            {roadmap.map((stage) => (
+              <div key={`roadmap-${stage.order}-${stage.title}`} className="bg-hud bg-opacity-60 border border-neon border-opacity-10 rounded-md p-3 text-xs text-white/90">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-neon font-semibold">Stage {stage.order}: {stage.title || 'Untitled'}</div>
+                  {stage.mapNode && (
+                    <span className="text-[10px] uppercase tracking-wide text-neon text-opacity-70">
+                      Node: {roadmapLabels[stage.mapNode] ?? stage.mapNode}
+                    </span>
+                  )}
+                </div>
+                {stage.summary && (
+                  <div className="mt-1 text-white/70 leading-relaxed">{stage.summary}</div>
+                )}
+                {stage.tasks.length > 0 && (
+                  <ul className="mt-2 list-disc list-inside space-y-1 text-[11px] text-neon text-opacity-80">
+                    {stage.tasks.map((taskTitle) => (
+                      <li key={`${stage.order}-${taskTitle}`}>{taskTitle}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
             ))}
           </div>

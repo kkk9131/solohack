@@ -64,11 +64,12 @@ export default function DashboardPage() {
             <TasksBoard
               tasks={tasksCtl.tasks}
               loading={tasksCtl.loading}
-              analyzing={tasksCtl.analyzing}
+              generating={tasksCtl.generating}
               add={tasksCtl.add}
               del={tasksCtl.del}
               setStatus={tasksCtl.setStatus}
-              analyzeDeps={tasksCtl.analyzeDeps}
+              generatePlan={tasksCtl.generatePlan}
+              roadmap={tasksCtl.roadmap}
             />
           </div>
         </div>
@@ -101,7 +102,11 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <DQMapMock />
+      <DQMapMock
+        tasks={tasksCtl.tasks}
+        loading={tasksCtl.loading}
+        completion={tasksCtl.completion}
+      />
 
       <ChatPanel
         open={chatOpen}

@@ -5,6 +5,10 @@ import useTypewriter from '@/lib/useTypewriter';
 import Avatar from '@/components/Avatar';
 import { getSettings } from '@/lib/settings';
 
+type Mode = 'chat' | 'requirements';
+type HistoryEntry = { role: 'user' | 'ai' | 'system'; content: string };
+type HistoriesState = Record<Mode, HistoryEntry[]>;
+
 export default function ChatPanel({
   open,
   onClose,
@@ -70,13 +74,48 @@ export default function ChatPanel({
   const [showCmds, setShowCmds] = useState(false);
   const [cmdIndex, setCmdIndex] = useState(0);
   const [cmdStage, setCmdStage] = useState<'root' | 'sound' | 'speed'>('root');
-  const [history, setHistory] = useState<{ role: 'user' | 'ai' | 'system'; content: string }[]>([]);
+  const [mode, setMode] = useState<Mode>('chat');
+  const [histories, setHistories] = useState<HistoriesState>({ chat: [], requirements: [] });
+  const history = histories[mode];
+  const [requirementDraft, setRequirementDraft] = useState('');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const [saveFeedback, setSaveFeedback] = useState('');
   const abortRef = useRef<AbortController | null>(null);
   const [typingFallback, setTypingFallback] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const cmdRef = useRef<HTMLDivElement | null>(null);
   const [noStreamPref, setNoStreamPref] = useState<boolean>(false);
+
+  function updateHistory(target: Mode, updater: (prev: HistoryEntry[]) => HistoryEntry[]) {
+    setHistories((prev) => {
+      const next: HistoriesState = { ...prev, [target]: updater(prev[target]) };
+      return next;
+    });
+  }
+
+  function pushHistory(entry: HistoryEntry, target: Mode = mode) {
+    updateHistory(target, (prev) => [...prev, entry]);
+  }
+
+  function clearHistory(target: Mode = mode) {
+    updateHistory(target, () => []);
+  }
+
+  const requirementsHistory = histories.requirements;
+  const inputPlaceholder = mode === 'requirements'
+    ? '要件を入力して Enter (AI がブラッシュアップを支援)'
+    : 'Type a message and press Enter';
+  const lastAiMessage = useMemo(() => {
+    for (let i = history.length - 1; i >= 0; i -= 1) {
+      if (history[i].role === 'ai') {
+        return history[i].content;
+      }
+    }
+    return '';
+  }, [history]);
+  const canFinalize = requirementDraft.trim().length > 0 && requirementsHistory.length > 0;
+  const isSavingRequirements = saveStatus === 'saving';
 
   // 自動スクロール（新しいテキスト/履歴/フォールバックの変化時に最下部へ）
   useEffect(() => {
@@ -94,9 +133,35 @@ export default function ChatPanel({
   // 日本語メモ: パネルを閉じたら次回のために履歴をクリア
   useEffect(() => {
     if (!open) {
-      setHistory([]);
+      setHistories({ chat: [], requirements: [] });
+      setRequirementDraft('');
+      setSaveStatus('idle');
+      setSaveFeedback('');
     }
   }, [open]);
+
+  useEffect(() => {
+    setShowCmds(false);
+    setCmdStage('root');
+    setCmdIndex(0);
+    setInput('');
+  }, [mode]);
+
+  // 日本語メモ: 要件モードに切り替えたとき、下書きが空であれば直近のAI応答で初期化。
+  useEffect(() => {
+    if (mode !== 'requirements') return;
+    if (!requirementDraft.trim()) {
+      for (let i = requirementsHistory.length - 1; i >= 0; i -= 1) {
+        const item = requirementsHistory[i];
+        if (item.role === 'ai') {
+          setRequirementDraft(item.content);
+          break;
+        }
+      }
+    }
+    setSaveStatus('idle');
+    setSaveFeedback('');
+  }, [mode, requirementsHistory, requirementDraft]);
 
   // 日本語メモ: 設定（AI名/口調、ストリーム既定、遅延ms）を読込み、チャットの初期値に反映
   useEffect(() => {
@@ -175,13 +240,41 @@ export default function ChatPanel({
     ];
   }, [showCmds, input, cmdStage]);
 
+  function formatConversation(conversation: HistoryEntry[]): string {
+    const aiTurns = conversation.filter((entry) => entry.role === 'ai').length;
+    const stageInstructions: string[] = [
+      'ステージ1: プロジェクトの背景や利用シーンを引き出す質問を1つだけ投げ、返答は最大2文に収めてください。',
+      'ステージ2: 主要な機能やユーザーストーリーを確認する質問を1つだけ投げ、返答は最大2文に収めてください。',
+      'ステージ3: これまでの内容を3行以内の箇条書きでまとめ、成功指標か次のアクションを1つ提案し、最後に「要件サマリーを保存しましょう」と促してください。',
+    ];
+    const currentStage = Math.min(aiTurns, stageInstructions.length - 1);
+    const stageHeader = stageInstructions[currentStage];
+
+    const header = [
+      'あなたは開発初心者を支援するプロダクト要件コーチです。',
+      '会話は日本語で行い、専門用語は可能な限り噛み砕いて説明してください。',
+      '会話は最大3ターンの応答で完結させてください。',
+      'ステージ1とステージ2では過去の内容を要約しないでください。具体例は最大1個に留め、初心者でも理解できる表現にします。',
+      'ステージ3のみ要約を行い、追加質問はせずに締めてください。',
+      'これまでの会話ログを参考に、抜けている観点があれば該当ステージで質問してください。',
+      stageHeader,
+      'ステージは合計3つです。ステージ3が完了したら、ユーザーに要件サマリーの確認と保存を促してください。',
+      '--- 会話ログ ---',
+    ];
+    const lines = conversation.map((entry) => {
+      const role = entry.role === 'user' ? 'User' : entry.role === 'ai' ? 'Assistant' : 'System';
+      return `${role}: ${entry.content}`;
+    });
+    return [...header, '', ...lines].join('\n');
+  }
+
   function executeSuggestion(item: CmdItem) {
     // ルート選択時の分岐
     if (item.cmd === '/sound') { setCmdStage('sound'); setCmdIndex(0); setInput('/sound '); return; }
     if (item.cmd === '/speed') { setCmdStage('speed'); setCmdIndex(0); setInput('/speed '); return; }
     if (item.cmd === '/help') {
       const res = parseCommand('/help');
-      if (res) setHistory((h) => [...h, { role: 'system', content: res }]);
+      if (res) pushHistory({ role: 'system', content: res });
       setShowCmds(false); setCmdIndex(0); setInput(''); setCmdStage('root');
       return;
     }
@@ -194,30 +287,35 @@ export default function ChatPanel({
       const val = prompt('表示速度(ms/文字)を入力してください', String(ssePace));
       if (!val) return; const ms = Number(val);
       if (!Number.isFinite(ms) || ms < 0) {
-        setHistory((h) => [...h, { role: 'system', content: 'Usage: /speed <ms>' }]);
+        pushHistory({ role: 'system', content: 'Usage: /speed <ms>' });
       } else {
         const res = parseCommand(`/speed ${ms}`);
-        if (res) setHistory((h) => [...h, { role: 'system', content: res }]);
+        if (res) pushHistory({ role: 'system', content: res });
       }
     } else {
       const res = parseCommand(item.cmd);
-      if (res) setHistory((h) => [...h, { role: 'system', content: res }]);
+      if (res) pushHistory({ role: 'system', content: res });
     }
     setShowCmds(false); setCmdIndex(0); setInput(''); setCmdStage('root');
   }
 
   async function sendMessage(message: string) {
     if (!message.trim() || streaming) return;
+    const activeMode = mode;
     if (message.trim().startsWith('/')) {
       const res = parseCommand(message.trim());
-      if (res) setHistory((h) => [...h, { role: 'system', content: res }]);
+      if (res) pushHistory({ role: 'system', content: res }, activeMode);
       return;
     }
     // 日本語メモ: 新規メッセージ開始時にタイプライターの残存テキストをクリア
     cancel();
     setText('');
+    const currentHistory = histories[activeMode] ?? [];
+    const requirementPrompt = activeMode === 'requirements'
+      ? formatConversation([...currentHistory, { role: 'user', content: message }])
+      : null;
     // ユーザー発言を履歴追加
-    setHistory((h) => [...h, { role: 'user', content: message }]);
+    pushHistory({ role: 'user', content: message }, activeMode);
     setStreaming(true);
     onStreamingChange?.(true);
     let useFallback = false;
@@ -226,11 +324,12 @@ export default function ChatPanel({
       const ac = new AbortController();
       abortRef.current = ac;
       const settings = getSettings();
+      const prompt = requirementPrompt ?? message;
       const res = await fetch('/api/chat/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: message,
+          prompt,
           tone: settings.tone,
           assistantName: settings.assistantName,
           noStream: noStreamPref,
@@ -281,11 +380,49 @@ export default function ChatPanel({
         } finally {
           setTypingFallback(false);
           onStreamingChange?.(false);
-          setHistory((h) => [...h, { role: 'ai', content: fallbackMessage }]);
+          pushHistory({ role: 'ai', content: fallbackMessage }, activeMode);
         }
       } else {
-        setHistory((h) => [...h, { role: 'ai', content: collected }]);
+        pushHistory({ role: 'ai', content: collected }, activeMode);
       }
+    }
+  }
+
+  async function finalizeRequirements() {
+    if (mode !== 'requirements') return;
+    const summary = requirementDraft.trim();
+    if (!summary) {
+      setSaveStatus('error');
+      setSaveFeedback('要件テキストを入力してください');
+      return;
+    }
+    if (requirementsHistory.length === 0) {
+      setSaveStatus('error');
+      setSaveFeedback('会話ログがまだありません');
+      return;
+    }
+    setSaveStatus('saving');
+    setSaveFeedback('');
+    try {
+      const res = await fetch('/api/tasks/requirements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          summary,
+          conversation: requirementsHistory,
+        }),
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(text || `Failed to save requirements (${res.status})`);
+      }
+      await res.json().catch(() => ({}));
+      setSaveStatus('success');
+      setSaveFeedback('要件を保存しました');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '保存に失敗しました';
+      setSaveStatus('error');
+      setSaveFeedback(message);
     }
   }
 
@@ -301,18 +438,51 @@ export default function ChatPanel({
           role="dialog"
           aria-modal="true"
         >
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-pixel pixel-title text-neon text-base">AI Chat</h3>
-            <div className="flex items-center gap-2">
+          <div className="mb-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <h3 className="font-pixel pixel-title text-neon text-base">AI Chat</h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    clearHistory();
+                    cancel();
+                    setText('');
+                    abortRef.current?.abort();
+                    setStreaming(false);
+                    onStreamingChange?.(false);
+                    setShowCmds(false);
+                    setCmdIndex(0);
+                    setCmdStage('root');
+                    if (mode === 'requirements') {
+                      setRequirementDraft('');
+                      setSaveStatus('idle');
+                      setSaveFeedback('');
+                    }
+                  }}
+                  className="px-3 py-1 text-sm border border-neon border-opacity-40 rounded-md hover:bg-neon hover:bg-opacity-10"
+                  title="Clear history"
+                >
+                  Clear
+                </button>
+                <button onClick={onClose} className="px-3 py-1 text-sm border border-neon border-opacity-40 rounded-md hover:bg-neon hover:bg-opacity-10">
+                  Close
+                </button>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 text-xs">
               <button
-                onClick={() => { setHistory([]); cancel(); setText(''); abortRef.current?.abort(); setStreaming(false); onStreamingChange?.(false); }}
-                className="px-3 py-1 text-sm border border-neon border-opacity-40 rounded-md hover:bg-neon hover:bg-opacity-10"
-                title="Clear history"
+                type="button"
+                onClick={() => setMode('chat')}
+                className={`px-3 py-1 border border-neon border-opacity-40 rounded-md transition ${mode === 'chat' ? 'bg-neon bg-opacity-15 text-neon' : 'text-white/70 hover:bg-neon hover:bg-opacity-10'}`}
               >
-                Clear
+                通常チャット
               </button>
-              <button onClick={onClose} className="px-3 py-1 text-sm border border-neon border-opacity-40 rounded-md hover:bg-neon hover:bg-opacity-10">
-                Close
+              <button
+                type="button"
+                onClick={() => setMode('requirements')}
+                className={`px-3 py-1 border border-neon border-opacity-40 rounded-md transition ${mode === 'requirements' ? 'bg-neon bg-opacity-15 text-neon' : 'text-white/70 hover:bg-neon hover:bg-opacity-10'}`}
+              >
+                要件ブラッシュアップ
               </button>
             </div>
           </div>
@@ -340,13 +510,59 @@ export default function ChatPanel({
             </div>
             <div className="pt-1">
               <Avatar state={(streaming || typingFallback) ? 'talk' : 'idle'} size={112} />
+          </div>
+        </div>
+        {mode === 'requirements' && (
+          <div className="mt-3 border border-neon border-opacity-20 rounded-md p-3 bg-bg bg-opacity-40 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="text-neon text-sm font-semibold">要件サマリー</h4>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!lastAiMessage) return;
+                  setRequirementDraft(lastAiMessage);
+                  setSaveStatus('idle');
+                  setSaveFeedback('');
+                }}
+                className="text-xs px-2 py-1 border border-neon border-opacity-30 rounded-md hover:bg-neon hover:bg-opacity-10 disabled:opacity-50"
+                disabled={!lastAiMessage}
+              >
+                最終AI応答をコピー
+              </button>
+            </div>
+            <textarea
+              rows={4}
+              className="w-full bg-bg text-white/90 border border-neon border-opacity-30 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-opacity-60"
+              value={requirementDraft}
+              onChange={(e) => {
+                setRequirementDraft(e.target.value);
+                setSaveStatus('idle');
+                setSaveFeedback('');
+              }}
+              placeholder="ここに確定した要件テキストをまとめてください"
+            />
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={finalizeRequirements}
+                className="px-3 py-1.5 text-sm border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10 disabled:opacity-60"
+                disabled={!canFinalize || isSavingRequirements || streaming}
+              >
+                {isSavingRequirements ? '保存中…' : '要件を保存'}
+              </button>
+              {saveFeedback && (
+                <span className={`text-xs ${saveStatus === 'success' ? 'text-emerald-300' : saveStatus === 'error' ? 'text-red-300' : 'text-white/60'}`}>
+                  {saveFeedback}
+                </span>
+              )}
             </div>
           </div>
-          <div ref={bottomRef} />
-          {/* 入力欄 */}
-          <form
-            className="mt-4 flex items-center gap-2 relative"
-            onSubmit={(e) => {
+        )}
+        <div ref={bottomRef} />
+        {/* 入力欄 */}
+        <form
+          className="mt-4 flex items-start gap-2 relative"
+          onSubmit={(e) => {
               e.preventDefault();
               const msg = input.trim();
               if (!msg) return;
@@ -354,10 +570,10 @@ export default function ChatPanel({
               sendMessage(msg);
             }}
           >
-            <input
-              type="text"
-              className="flex-1 bg-bg text-white/90 placeholder:text-white/40 border border-neon border-opacity-20 rounded-md px-3 py-2 focus:outline-none focus:border-opacity-40"
-              placeholder="Type a message and press Enter"
+            <textarea
+              rows={mode === 'requirements' ? 3 : 2}
+              className="flex-1 bg-bg text-white/90 placeholder:text-white/40 border border-neon border-opacity-20 rounded-md px-3 py-2 focus:outline-none focus:border-opacity-40 resize-none"
+              placeholder={inputPlaceholder}
               value={input}
               onChange={(e) => {
                 const v = e.target.value;
@@ -371,21 +587,44 @@ export default function ChatPanel({
                 }
               }}
               onKeyDown={(e) => {
-                if (!showCmds) return;
-                if (e.key === 'ArrowDown') {
+                if (showCmds) {
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setCmdIndex((i) => (i + 1) % Math.max(1, suggestions.length));
+                    return;
+                  }
+                  if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setCmdIndex((i) => (i - 1 + Math.max(1, suggestions.length)) % Math.max(1, suggestions.length));
+                    return;
+                  }
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (suggestions.length) executeSuggestion(suggestions[Math.max(0, Math.min(cmdIndex, suggestions.length - 1))]);
+                    return;
+                  }
+                  if (e.key === 'ArrowLeft' && cmdStage !== 'root') {
+                    e.preventDefault();
+                    setCmdStage('root');
+                    setCmdIndex(0);
+                    setInput('/');
+                    return;
+                  }
+                  if (e.key === 'Escape') {
+                    e.preventDefault();
+                    setShowCmds(false);
+                    setCmdStage('root');
+                    setCmdIndex(0);
+                    return;
+                  }
+                }
+
+                if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
                   e.preventDefault();
-                  setCmdIndex((i) => (i + 1) % Math.max(1, suggestions.length));
-                } else if (e.key === 'ArrowUp') {
-                  e.preventDefault();
-                  setCmdIndex((i) => (i - 1 + Math.max(1, suggestions.length)) % Math.max(1, suggestions.length));
-                } else if (e.key === 'Enter') {
-                  e.preventDefault();
-                  if (suggestions.length) executeSuggestion(suggestions[Math.max(0, Math.min(cmdIndex, suggestions.length - 1))]);
-                } else if (e.key === 'ArrowLeft') {
-                  if (cmdStage !== 'root') { e.preventDefault(); setCmdStage('root'); setCmdIndex(0); setInput('/'); }
-                } else if (e.key === 'Escape') {
-                  e.preventDefault();
-                  setShowCmds(false); setCmdStage('root'); setCmdIndex(0);
+                  const msg = input.trim();
+                  if (!msg) return;
+                  setInput('');
+                  sendMessage(msg);
                 }
               }}
               disabled={streaming}

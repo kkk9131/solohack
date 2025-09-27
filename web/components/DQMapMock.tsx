@@ -1,6 +1,8 @@
 "use client";
 
 import { type CSSProperties, useMemo, useState } from "react";
+import type { WebTask } from "@/lib/tasksStorage";
+import { dependencyLayers, groupByStatus, inferStatus } from "@/lib/taskGrouping";
 
 type CommandKey = "tasks" | "pomo" | "records";
 
@@ -9,8 +11,10 @@ type CommandConfig = {
   label: string;
 };
 
+type NodeKey = "start" | "front" | "back" | "infra" | "release";
+
 type NodeConfig = {
-  key: string;
+  key: NodeKey;
   label: string;
   top: string;
   left: string;
@@ -30,31 +34,153 @@ const nodeList: NodeConfig[] = [
   { key: "release", label: "リリース城", top: "26%", left: "86%" },
 ];
 
-const commandDetails: Record<CommandKey, string[]> = {
-  tasks: [
-    "・ソロハック任務 3/7",
-    "・最優先: API改善",
-    "・進捗率: 42%",
-  ],
-  pomo: [
-    "・次のセッション 25:00",
-    "・完了ポモ: 2",
-    "・リカバリまで 5:00",
-  ],
-  records: [
-    "・連続達成 5日",
-    "・週完了ミッション 12件",
-    "・最速タスク 15分",
-  ],
+const nodeKeyOrder: NodeKey[] = nodeList.map((node) => node.key);
+const statusFallback: Record<"todo" | "in-progress" | "done", NodeKey> = {
+  todo: "start",
+  "in-progress": "front",
+  done: "release",
 };
 
-export default function DQMapMock() {
+type DQMapMockProps = {
+  tasks: WebTask[];
+  loading: boolean;
+  completion: number;
+};
+
+export default function DQMapMock({ tasks, loading, completion }: DQMapMockProps) {
   // 日本語メモ: DQ風ダッシュボードの雰囲気を掴むためのモック。コマンド選択をローカル状態で疑似再現する。
   const [selectedCommand, setSelectedCommand] = useState<CommandKey>("tasks");
   const [detailVisible, setDetailVisible] = useState(true);
   const [statusVisible, setStatusVisible] = useState(true);
   const [commandVisible, setCommandVisible] = useState(true);
   const [messageVisible, setMessageVisible] = useState(true);
+
+  const statusGroups = useMemo(() => groupByStatus(tasks), [tasks]);
+  const layers = useMemo(() => dependencyLayers(tasks), [tasks]);
+  const layerIndexByTask = useMemo(() => {
+    const map = new Map<number, number>();
+    layers.forEach((layer, index) => {
+      layer.forEach((task) => map.set(task.id, index));
+    });
+    return map;
+  }, [layers]);
+  const totalTasks = tasks.length;
+  const doneTasks = statusGroups["done"].length;
+  const inProgressTasks = statusGroups["in-progress"].length;
+  const todoTasks = statusGroups["todo"].length;
+  const focusGauge = useMemo(() => {
+    // 日本語メモ: 6分割の簡易ゲージ。進捗率が0-100%に収まっていなくても丸めて描画。
+    const totalBars = 6;
+    const clamped = Math.max(0, Math.min(100, Math.round(completion)));
+    const filled = Math.min(totalBars, Math.round((clamped / 100) * totalBars));
+    const empty = Math.max(0, totalBars - filled);
+    return `${"█".repeat(filled)}${"░".repeat(empty)}`;
+  }, [completion]);
+
+  const tasksByNode = useMemo(() => {
+    const buckets = Object.fromEntries(
+      nodeKeyOrder.map((key) => [key, [] as WebTask[]]),
+    ) as Record<NodeKey, WebTask[]>;
+
+    for (const task of tasks) {
+      const layerIndex = layerIndexByTask.get(task.id);
+      let nodeKey: NodeKey;
+      if (layerIndex != null) {
+        const clamped = Math.min(layerIndex, nodeKeyOrder.length - 1);
+        nodeKey = nodeKeyOrder[clamped] ?? nodeKeyOrder[nodeKeyOrder.length - 1];
+      } else if (layers.length === 0) {
+        const fallback = statusFallback[inferStatus(task)];
+        nodeKey = fallback ?? nodeKeyOrder[0];
+      } else {
+        nodeKey = nodeKeyOrder[0];
+      }
+      buckets[nodeKey].push(task);
+    }
+
+    for (const list of Object.values(buckets)) {
+      list.sort((a, b) => a.id - b.id);
+    }
+
+    return buckets;
+  }, [tasks, layerIndexByTask, layers.length]);
+
+  const renderTasksDetail = () => {
+    // 日本語メモ: タスク状態と依存レイヤーをDQ風メッセージに要約して表示する。
+    if (loading) {
+      return <div>タスク同期中...</div>;
+    }
+    if (totalTasks === 0) {
+      return <div>タスクがありません。コマンドで追加しましょう。</div>;
+    }
+
+    return (
+      <>
+        <div>
+          合計 {totalTasks} 件 / 完了 {doneTasks} 件 ({completion}%)
+        </div>
+        <div>実行中 {inProgressTasks} 件 / 未着手 {todoTasks} 件</div>
+        {layers.length === 0 ? (
+          <div className="mt-2 text-xs">依存関係データはまだありません。</div>
+        ) : (
+          <div className="mt-2 space-y-1 text-xs leading-relaxed">
+            {layers.map((layer, index) => {
+              const titles = layer.map((task) => task.title);
+              const preview = titles.slice(0, 3).join("、");
+              const suffix = titles.length > 3 ? "、…" : "";
+              return (
+                <div key={`stage-${index}`} className="flex gap-2">
+                  <span className="text-[var(--dq-gold)] whitespace-nowrap">
+                    Stage {index + 1}
+                  </span>
+                  <span className="flex-1 truncate">
+                    {titles.length === 0 ? "(なし)" : `${preview}${suffix}`}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <div className="mt-2 space-y-1 text-xs leading-relaxed">
+          {nodeList.map((node) => (
+            <div key={`node-summary-${node.key}`} className="flex gap-2">
+              <span className="text-[var(--dq-gold)] whitespace-nowrap">
+                {node.label}
+              </span>
+              <span className="flex-1 truncate">
+                {tasksByNode[node.key].length === 0
+                  ? "待機中"
+                  : `${tasksByNode[node.key].length} 件配置`}
+              </span>
+            </div>
+          ))}
+        </div>
+      </>
+    );
+  };
+
+  const detailContent = (() => {
+    switch (selectedCommand) {
+      case "tasks":
+        return renderTasksDetail();
+      case "pomo":
+        return (
+          <>
+            <div>・次のセッション 25:00</div>
+            <div>・完了ポモ 2 / 目標 4</div>
+            <div>・リカバリまで 05:00</div>
+          </>
+        );
+      case "records":
+      default:
+        return (
+          <>
+            <div>・連続達成 5日</div>
+            <div>・週完了ミッション 12件</div>
+            <div>・最速タスク 15分</div>
+          </>
+        );
+    }
+  })();
 
   const themeStyle = useMemo<CSSProperties>(
     () =>
@@ -118,6 +244,23 @@ export default function DQMapMock() {
               >
                 {node.label}
               </div>
+              {tasksByNode[node.key].length > 0 && (
+                <div
+                  className="w-40 px-3 py-2 bg-[rgba(0,216,255,0.12)] border-2 border-[var(--dq-gold)] text-[11px] font-pixel text-left space-y-1"
+                  style={{ textShadow: "1px 1px 0 var(--dq-black)" }}
+                >
+                  {tasksByNode[node.key].slice(0, 3).map((task) => (
+                    <div key={`${node.key}-${task.id}`} className="truncate">
+                      ・{task.title}
+                    </div>
+                  ))}
+                  {tasksByNode[node.key].length > 3 && (
+                    <div className="text-[10px] text-[var(--dq-gold)]">
+                      他 {tasksByNode[node.key].length - 3} 件
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ))}
 
@@ -141,8 +284,9 @@ export default function DQMapMock() {
             style={{ textShadow: "2px 2px 0 var(--dq-black)" }}
           >
             <div className="text-lg">勇者 かずと</div>
-            <div>完了タスク: 3/7</div>
-            <div>集中ゲージ: ████░░</div>
+            <div>完了タスク: {doneTasks}/{totalTasks}</div>
+            <div>実行中: {inProgressTasks} / 未着手: {todoTasks}</div>
+            <div>集中ゲージ: {focusGauge}</div>
           </div>
         )}
 
@@ -186,9 +330,7 @@ export default function DQMapMock() {
               className={`${windowClass} w-[520px] px-5 py-4 font-pixel text-sm space-y-1`}
               style={{ textShadow: "2px 2px 0 var(--dq-black)" }}
             >
-              {commandDetails[selectedCommand].map((line) => (
-                <div key={line}>{line}</div>
-              ))}
+              {detailContent}
               <div className="animate-pulse text-right">▶︎</div>
             </div>
           </div>
