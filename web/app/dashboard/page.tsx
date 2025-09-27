@@ -104,6 +104,7 @@ export default function DashboardPage() {
 
       <DQMapMock
         tasks={tasksCtl.tasks}
+        roadmap={tasksCtl.roadmap}
         loading={tasksCtl.loading}
         completion={tasksCtl.completion}
       />
@@ -112,6 +113,8 @@ export default function DashboardPage() {
         open={chatOpen}
         onClose={() => setChatOpen(false)}
         onStreamingChange={(streaming) => setAvatarState(streaming ? "talk" : "idle")}
+        onGeneratePlan={tasksCtl.generatePlan}
+        generatingPlan={tasksCtl.generating}
       />
 
       <AnimatePresence>

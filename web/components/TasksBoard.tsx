@@ -1,9 +1,9 @@
 "use client";
 import { useMemo, useRef, useState, type DragEvent } from 'react';
 import type { WebTask } from '@/lib/tasksStorage';
-import type { RoadmapStage, Status } from '@/lib/useTasksController';
+import type { GeneratePlanResult, RoadmapStage, Status } from '@/lib/useTasksController';
 import { motion } from 'framer-motion';
-import { dependencyLayers, groupByStatus } from '@/lib/taskGrouping';
+import { groupByStatus } from '@/lib/taskGrouping';
 
 export default function TasksBoard({
   tasks,
@@ -21,13 +21,11 @@ export default function TasksBoard({
   add: (title: string) => Promise<void> | void;
   del: (id: number) => Promise<void> | void;
   setStatus: (id: number, status: Status) => Promise<void> | void;
-  generatePlan: () => Promise<void> | void;
+  generatePlan: () => Promise<GeneratePlanResult>;
   roadmap: RoadmapStage[];
 }) {
   const [title, setTitle] = useState('');
   const groups = useMemo(() => groupByStatus(tasks), [tasks]);
-  const layers = useMemo(() => dependencyLayers(tasks), [tasks]);
-
   // DnD: ドラッグ中のIDと見た目ハイライト制御
   const draggingIdRef = useRef<number | null>(null);
   const [hoverCol, setHoverCol] = useState<Status | null>(null);
@@ -78,7 +76,7 @@ export default function TasksBoard({
         <button className="px-3 py-2 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10" onClick={async () => { const t = title; setTitle(''); await add(t); }}>Add</button>
         <button
           className="px-3 py-2 border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10 disabled:opacity-50"
-          onClick={generatePlan}
+          onClick={() => { void generatePlan(); }}
           disabled={generating || loading}
           title="要件サマリーからタスクとロードマップを再生成"
         >Generate Plan</button>
@@ -141,27 +139,6 @@ export default function TasksBoard({
             </div>
           </div>
         ))}
-      </div>
-
-      {/* 依存グループ可視化 */}
-      <div className="mt-2">
-        <div className="text-neon text-sm font-semibold mb-2">依存関係の段階表示</div>
-        {layers.length === 0 ? (
-          <div className="text-xs text-neon text-opacity-60">No tasks</div>
-        ) : (
-          <div className="flex items-start gap-3 overflow-x-auto">
-            {layers.map((layer, i) => (
-              <div key={i} className="min-w-[220px] bg-hud bg-opacity-60 border border-neon border-opacity-10 rounded-md p-2">
-                <div className="text-neon text-xs mb-1">Stage {i + 1}</div>
-                <div className="space-y-1">
-                  {layer.map((t) => (
-                    <div key={t.id} className="bg-bg border border-neon/10 rounded px-2 py-1 text-xs text-white/90 truncate">{t.title}</div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       <div className="mt-4">

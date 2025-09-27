@@ -2,12 +2,16 @@
 // 日本語メモ: タスク状態と操作をまとめたコントローラーフック。
 // Dashboard で呼び出し、HUDProgress と Kanban に配布して同期を保つ。
 import { useCallback, useMemo, useState } from 'react';
-import type { WebTask } from '@/lib/tasksStorage';
+import type { TaskMergeSummary, WebTask } from '@/lib/tasksStorage';
 import type { PlannerRoadmapStage } from '@/lib/planning';
 
 export type Status = 'todo' | 'in-progress' | 'done';
 
 export type RoadmapStage = PlannerRoadmapStage;
+
+export type GeneratePlanResult =
+  | { success: true; summary: TaskMergeSummary; skipped?: string | null }
+  | { success: false; error: string };
 
 export default function useTasksController() {
   const [tasks, setTasks] = useState<WebTask[]>([]);
@@ -60,19 +64,38 @@ export default function useTasksController() {
     return Math.round((done / total) * 100);
   }, [tasks]);
 
-  const generatePlan = useCallback(async () => {
+  const generatePlan = useCallback(async (): Promise<GeneratePlanResult> => {
     setGenerating(true);
     try {
       const res = await fetch('/api/tasks/generate', { method: 'POST' });
-      if (!res.ok) throw new Error(`POST /api/tasks/generate ${res.status}`);
-      const data = await res.json().catch(() => ({ tasks: [], roadmap: [] }));
-      const generatedTasks = Array.isArray(data.tasks) ? data.tasks : [];
-      const generatedRoadmap = normalizeRoadmap(data.roadmap);
-      setTasks(generatedTasks);
-      setRoadmap(generatedRoadmap);
-    } catch {
-      // 日本語メモ: 失敗時は最新タスクを取り直してUIを戻す。
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(text || `POST /api/tasks/generate ${res.status}`);
+      }
+      const data = await res.json().catch(() => ({}));
+      const skipped = typeof data.skipped === 'string' ? data.skipped : null;
+
+      if (!skipped) {
+        const generatedTasks = Array.isArray(data.tasks) ? data.tasks : [];
+        const generatedRoadmap = normalizeRoadmap(data.roadmap);
+        setTasks(generatedTasks);
+        setRoadmap(generatedRoadmap);
+      }
+
+      const summaryRaw = data.mergeSummary as Partial<TaskMergeSummary> | undefined;
+      const summary: TaskMergeSummary = {
+        added: typeof summaryRaw?.added === 'number' ? Math.max(0, Math.floor(summaryRaw.added)) : 0,
+        updated: typeof summaryRaw?.updated === 'number' ? Math.max(0, Math.floor(summaryRaw.updated)) : 0,
+        unchanged: typeof summaryRaw?.unchanged === 'number' ? Math.max(0, Math.floor(summaryRaw.unchanged)) : 0,
+        totalSeeds: typeof summaryRaw?.totalSeeds === 'number' ? Math.max(0, Math.floor(summaryRaw.totalSeeds)) : 0,
+      };
+
+      return { success: true, summary, skipped };
+    } catch (err) {
+      // 日本語メモ: APIエラー時は既存タスクを再取得して状態を復元
       await refresh();
+      const message = err instanceof Error ? err.message : 'Failed to generate plan';
+      return { success: false, error: message };
     } finally {
       setGenerating(false);
     }

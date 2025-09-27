@@ -31,9 +31,13 @@ export async function POST() {
     }
 
     const seeds = parsed.tasks.map((task) => ({ title: task.title, mapNode: task.mapNode }));
-    const savedTasks = await replaceTasksWithGenerated(seeds);
+    const mergeResult = await replaceTasksWithGenerated(seeds);
 
-    return Response.json({ tasks: savedTasks, roadmap: parsed.roadmap });
+    return Response.json({
+      tasks: mergeResult.tasks,
+      roadmap: parsed.roadmap,
+      mergeSummary: mergeResult.summary,
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Error';
     return new Response(message, { status: 500 });

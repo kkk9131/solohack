@@ -1,7 +1,8 @@
 "use client";
 
 import { type CSSProperties, useMemo, useState } from "react";
-import type { WebTask } from "@/lib/tasksStorage";
+import type { MapNodeKey, WebTask } from "@/lib/tasksStorage";
+import type { RoadmapStage } from "@/lib/useTasksController";
 import { dependencyLayers, groupByStatus, inferStatus } from "@/lib/taskGrouping";
 
 type CommandKey = "tasks" | "pomo" | "records";
@@ -11,7 +12,7 @@ type CommandConfig = {
   label: string;
 };
 
-type NodeKey = "start" | "front" | "back" | "infra" | "release";
+type NodeKey = MapNodeKey;
 
 type NodeConfig = {
   key: NodeKey;
@@ -41,13 +42,31 @@ const statusFallback: Record<"todo" | "in-progress" | "done", NodeKey> = {
   done: "release",
 };
 
+type StageSnapshot = {
+  stage: RoadmapStage;
+  total: number;
+  done: number;
+  inProgress: number;
+  percent: number;
+  missing: number;
+  nodeKey: NodeKey;
+};
+
+type NodeProgress = {
+  total: number;
+  done: number;
+  inProgress: number;
+  percent: number;
+};
+
 type DQMapMockProps = {
   tasks: WebTask[];
+  roadmap: RoadmapStage[];
   loading: boolean;
   completion: number;
 };
 
-export default function DQMapMock({ tasks, loading, completion }: DQMapMockProps) {
+export default function DQMapMock({ tasks, roadmap, loading, completion }: DQMapMockProps) {
   // 日本語メモ: DQ風ダッシュボードの雰囲気を掴むためのモック。コマンド選択をローカル状態で疑似再現する。
   const [selectedCommand, setSelectedCommand] = useState<CommandKey>("tasks");
   const [detailVisible, setDetailVisible] = useState(true);
@@ -77,6 +96,77 @@ export default function DQMapMock({ tasks, loading, completion }: DQMapMockProps
     return `${"█".repeat(filled)}${"░".repeat(empty)}`;
   }, [completion]);
 
+  const tasksByTitle = useMemo(() => {
+    const map = new Map<string, WebTask[]>();
+    for (const task of tasks) {
+      const key = task.title.trim().toLowerCase();
+      if (!key) continue;
+      if (!map.has(key)) {
+        map.set(key, []);
+      }
+      map.get(key)!.push(task);
+    }
+    return map;
+  }, [tasks]);
+
+  const stageSnapshots = useMemo<StageSnapshot[]>(() => {
+    if (!roadmap || roadmap.length === 0) return [];
+    // 日本語メモ: タイトル単位でタスクを紐付け、ステージ進捗を集計する。
+    const buckets = new Map<string, WebTask[]>();
+    tasksByTitle.forEach((list, key) => {
+      buckets.set(key, [...list]);
+    });
+
+    return roadmap.map((stage) => {
+      const matched: WebTask[] = [];
+      for (const rawTitle of stage.tasks) {
+        const key = rawTitle.trim().toLowerCase();
+        if (!key) continue;
+        const pool = buckets.get(key);
+        if (pool && pool.length > 0) {
+          matched.push(pool.shift()!);
+        }
+      }
+      const total = stage.tasks.length;
+      const done = matched.filter((task) => task.completed).length;
+      const inProgressCount = matched.filter((task) => inferStatus(task) === "in-progress").length;
+      const nodeKey =
+        stage.mapNode && nodeKeyOrder.includes(stage.mapNode as NodeKey)
+          ? (stage.mapNode as NodeKey)
+          : nodeKeyOrder[Math.min(Math.max(stage.order - 1, 0), nodeKeyOrder.length - 1)] ?? nodeKeyOrder[0];
+      const percent = total === 0 ? 0 : Math.round((done / total) * 100);
+      const missing = Math.max(0, total - matched.length);
+      return { stage, total, done, inProgress: inProgressCount, percent, missing, nodeKey };
+    });
+  }, [roadmap, tasksByTitle]);
+
+  const stageSnapshotsByNode = useMemo(() => {
+    const base = Object.fromEntries(
+      nodeKeyOrder.map((key) => [key, [] as StageSnapshot[]]),
+    ) as Record<NodeKey, StageSnapshot[]>;
+    for (const snapshot of stageSnapshots) {
+      base[snapshot.nodeKey].push(snapshot);
+    }
+    return base;
+  }, [stageSnapshots]);
+
+  const nodeProgress = useMemo(() => {
+    const base = Object.fromEntries(
+      nodeKeyOrder.map((key) => [key, { total: 0, done: 0, inProgress: 0, percent: 0 }]),
+    ) as Record<NodeKey, NodeProgress>;
+    for (const snapshot of stageSnapshots) {
+      const entry = base[snapshot.nodeKey];
+      entry.total += snapshot.total;
+      entry.done += snapshot.done;
+      entry.inProgress += snapshot.inProgress;
+    }
+    nodeKeyOrder.forEach((key) => {
+      const entry = base[key];
+      entry.percent = entry.total === 0 ? 0 : Math.round((entry.done / entry.total) * 100);
+    });
+    return base;
+  }, [stageSnapshots]);
+
   const tasksByNode = useMemo(() => {
     const buckets = Object.fromEntries(
       nodeKeyOrder.map((key) => [key, [] as WebTask[]]),
@@ -85,7 +175,9 @@ export default function DQMapMock({ tasks, loading, completion }: DQMapMockProps
     for (const task of tasks) {
       const layerIndex = layerIndexByTask.get(task.id);
       let nodeKey: NodeKey;
-      if (layerIndex != null) {
+      if (task.mapNode && nodeKeyOrder.includes(task.mapNode)) {
+        nodeKey = task.mapNode;
+      } else if (layerIndex != null) {
         const clamped = Math.min(layerIndex, nodeKeyOrder.length - 1);
         nodeKey = nodeKeyOrder[clamped] ?? nodeKeyOrder[nodeKeyOrder.length - 1];
       } else if (layers.length === 0) {
@@ -140,20 +232,63 @@ export default function DQMapMock({ tasks, loading, completion }: DQMapMockProps
             })}
           </div>
         )}
-        <div className="mt-2 space-y-1 text-xs leading-relaxed">
-          {nodeList.map((node) => (
-            <div key={`node-summary-${node.key}`} className="flex gap-2">
-              <span className="text-[var(--dq-gold)] whitespace-nowrap">
-                {node.label}
-              </span>
-              <span className="flex-1 truncate">
-                {tasksByNode[node.key].length === 0
-                  ? "待機中"
-                  : `${tasksByNode[node.key].length} 件配置`}
-              </span>
-            </div>
-          ))}
+        <div className="mt-2 space-y-2 text-xs leading-relaxed">
+          {nodeList.map((node) => {
+            const progress = nodeProgress[node.key];
+            const nodeTasks = tasksByNode[node.key];
+            const stageDetails = stageSnapshotsByNode[node.key];
+            return (
+              <div key={`node-summary-${node.key}`} className="flex flex-col gap-0.5">
+                <div className="flex gap-2">
+                  <span className="text-[var(--dq-gold)] whitespace-nowrap">
+                    {node.label}
+                  </span>
+                  <span className="flex-1 truncate">
+                    {progress.total > 0
+                      ? `Stage完了 ${progress.done}/${progress.total} (${progress.percent}%)`
+                      : nodeTasks.length === 0
+                        ? "待機中"
+                        : `${nodeTasks.length} 件配置`}
+                  </span>
+                </div>
+                {stageDetails.length > 0 && (
+                  <div className="pl-4 text-[10px] text-[var(--dq-white)]/80 space-y-0.5">
+                    {stageDetails.map((snapshot) => (
+                      <div
+                        key={`node-stage-${node.key}-${snapshot.stage.order}`}
+                        className="flex items-center justify-between gap-2"
+                      >
+                        <span className="truncate">
+                          Stage {snapshot.stage.order}: {snapshot.stage.title || "Untitled"}
+                        </span>
+                        <span>{snapshot.percent}%</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
+        {stageSnapshots.length > 0 && (
+          <div className="mt-3 space-y-1 text-xs leading-relaxed">
+            <div className="text-[var(--dq-gold)]">ロードマップ進捗</div>
+            {stageSnapshots.map((snapshot) => (
+              <div
+                key={`stage-summary-${snapshot.stage.order}`}
+                className="flex items-center justify-between gap-2"
+              >
+                <span className="truncate">
+                  Stage {snapshot.stage.order}: {snapshot.stage.title || "Untitled"}
+                </span>
+                <span>
+                  {snapshot.percent}% ({snapshot.done}/{snapshot.total})
+                  {snapshot.missing > 0 ? ` (+${snapshot.missing} 未反映)` : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </>
     );
   };
@@ -244,6 +379,25 @@ export default function DQMapMock({ tasks, loading, completion }: DQMapMockProps
               >
                 {node.label}
               </div>
+              {stageSnapshotsByNode[node.key].length > 0 && (
+                <div
+                  className="w-44 px-3 py-2 bg-[rgba(0,216,255,0.18)] border-2 border-[var(--dq-gold)] text-[10px] font-pixel text-left space-y-1"
+                  style={{ textShadow: "1px 1px 0 var(--dq-black)" }}
+                >
+                  {stageSnapshotsByNode[node.key].map((snapshot) => (
+                    <div
+                      key={`node-panel-stage-${node.key}-${snapshot.stage.order}`}
+                      className="flex items-center justify-between gap-1"
+                    >
+                      <span className="truncate">
+                        Stage {snapshot.stage.order}
+                        {snapshot.stage.title ? `: ${snapshot.stage.title}` : ""}
+                      </span>
+                      <span>{snapshot.percent}%</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               {tasksByNode[node.key].length > 0 && (
                 <div
                   className="w-40 px-3 py-2 bg-[rgba(0,216,255,0.12)] border-2 border-[var(--dq-gold)] text-[11px] font-pixel text-left space-y-1"
@@ -264,8 +418,6 @@ export default function DQMapMock({ tasks, loading, completion }: DQMapMockProps
             </div>
           ))}
 
-          <div className="absolute left-[16%] top-[42%] w-20 h-20 bg-[url('/avatars/default/idle.png')] bg-contain bg-no-repeat" />
-          <div className="absolute left-[28%] top-[34%] w-16 h-16 bg-[url('/avatars/default/celebrate.png')] bg-contain bg-no-repeat opacity-80" />
           {messageVisible && (
             <div className="absolute right-10 bottom-12 flex flex-col items-end gap-2">
               <div
