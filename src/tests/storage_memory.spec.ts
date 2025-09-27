@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 describe('memory storage provider', () => {
   beforeEach(async () => {
@@ -6,6 +6,10 @@ describe('memory storage provider', () => {
     process.env.SOLOHACK_STORAGE_PROVIDER = 'memory';
     const { __resetMemoryProvider } = await import('../core/storage/memoryProvider.js');
     __resetMemoryProvider();
+  });
+
+  afterEach(() => {
+    delete process.env.SOLOHACK_STORAGE_PROVIDER;
   });
 
   it('persists tasks in-process without touching filesystem', async () => {
@@ -33,4 +37,3 @@ describe('memory storage provider', () => {
     expect(await loadTimer()).toBeUndefined();
   });
 });
-
