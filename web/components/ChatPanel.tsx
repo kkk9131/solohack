@@ -4,19 +4,42 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import useTypewriter from '@/lib/useTypewriter';
 import Avatar from '@/components/Avatar';
 import { getSettings } from '@/lib/settings';
+import type { GeneratePlanResult } from '@/lib/useTasksController';
+import type { RequirementsSession } from '@/lib/tasksStorage';
 
 type Mode = 'chat' | 'requirements';
 type HistoryEntry = { role: 'user' | 'ai' | 'system'; content: string };
 type HistoriesState = Record<Mode, HistoryEntry[]>;
 
+function normalizeRequirementHistory(value: unknown): HistoryEntry[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object') return undefined;
+      const record = entry as Record<string, unknown>;
+      const role = record.role;
+      const content = record.content;
+      if (role !== 'user' && role !== 'ai' && role !== 'system') return undefined;
+      if (typeof content !== 'string') return undefined;
+      const trimmed = content.trim();
+      if (!trimmed) return undefined;
+      return { role: role as HistoryEntry['role'], content }; // 元の整形を尊重
+    })
+    .filter((item): item is HistoryEntry => Boolean(item));
+}
+
 export default function ChatPanel({
   open,
   onClose,
   onStreamingChange,
+  onGeneratePlan,
+  generatingPlan,
 }: {
   open: boolean;
   onClose: () => void;
   onStreamingChange?: (streaming: boolean) => void;
+  onGeneratePlan?: () => Promise<GeneratePlanResult>;
+  generatingPlan?: boolean;
 }) {
   // 日本語メモ: タイプライター + SSE ペーサ + 効果音（ENVを初期値に、/commandで更新）
   const envDefaults = useMemo(() => ({
@@ -80,11 +103,16 @@ export default function ChatPanel({
   const [requirementDraft, setRequirementDraft] = useState('');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [saveFeedback, setSaveFeedback] = useState('');
+  const [requirementsUpdatedAt, setRequirementsUpdatedAt] = useState<string | null>(null);
+  const [planStatus, setPlanStatus] = useState<'idle' | 'loading' | 'success' | 'skipped' | 'error'>('idle');
+  const [planFeedback, setPlanFeedback] = useState('');
   const abortRef = useRef<AbortController | null>(null);
   const [typingFallback, setTypingFallback] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const cmdRef = useRef<HTMLDivElement | null>(null);
+  const requirementsFetchedRef = useRef(false);
+  const requirementsFetchAbortRef = useRef<AbortController | null>(null);
   const [noStreamPref, setNoStreamPref] = useState<boolean>(false);
 
   function updateHistory(target: Mode, updater: (prev: HistoryEntry[]) => HistoryEntry[]) {
@@ -116,6 +144,25 @@ export default function ChatPanel({
   }, [history]);
   const canFinalize = requirementDraft.trim().length > 0 && requirementsHistory.length > 0;
   const isSavingRequirements = saveStatus === 'saving';
+  const formattedRequirementsUpdatedAt = useMemo(() => {
+    if (!requirementsUpdatedAt) return '';
+    const date = new Date(requirementsUpdatedAt);
+    if (Number.isNaN(date.getTime())) return '';
+    return new Intl.DateTimeFormat('ja-JP', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+  }, [requirementsUpdatedAt]);
+  const saveMessageColor = saveStatus === 'success' ? 'text-emerald-300' : saveStatus === 'error' ? 'text-red-300' : 'text-white/60';
+  const planMessageColor = planStatus === 'success'
+    ? 'text-emerald-300'
+    : planStatus === 'error'
+      ? 'text-red-300'
+      : planStatus === 'skipped'
+        ? 'text-amber-300'
+        : 'text-white/60';
+  const isPlanBusy = planStatus === 'loading' || Boolean(generatingPlan);
+  const planButtonLabel = isPlanBusy ? 'プラン生成中…' : 'プランを生成';
+  const planButtonTitle = saveStatus === 'success'
+    ? '保存済みの要件からプランを生成'
+    : '要件を保存するとプラン生成できます';
 
   // 自動スクロール（新しいテキスト/履歴/フォールバックの変化時に最下部へ）
   useEffect(() => {
@@ -137,6 +184,12 @@ export default function ChatPanel({
       setRequirementDraft('');
       setSaveStatus('idle');
       setSaveFeedback('');
+      requirementsFetchAbortRef.current?.abort();
+      requirementsFetchAbortRef.current = null;
+      requirementsFetchedRef.current = false;
+      setRequirementsUpdatedAt(null);
+      setPlanStatus('idle');
+      setPlanFeedback('');
     }
   }, [open]);
 
@@ -162,6 +215,63 @@ export default function ChatPanel({
     setSaveStatus('idle');
     setSaveFeedback('');
   }, [mode, requirementsHistory, requirementDraft]);
+
+  useEffect(() => {
+    if (!open || mode !== 'requirements') return;
+    if (requirementsFetchedRef.current) return;
+    if (requirementsHistory.length > 0) return;
+
+    const controller = new AbortController();
+    requirementsFetchAbortRef.current?.abort();
+    requirementsFetchAbortRef.current = controller;
+    requirementsFetchedRef.current = true;
+    let resetFlag = false;
+
+    (async () => {
+      try {
+        const res = await fetch('/api/tasks/requirements', { cache: 'no-store', signal: controller.signal });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => null);
+        const session = data && typeof data === 'object'
+          ? ((data as { requirements?: RequirementsSession }).requirements ?? null)
+          : null;
+        if (!session || typeof session.summary !== 'string' || !session.summary.trim()) return;
+        const entries = normalizeRequirementHistory(session.conversation);
+        setHistories((prev) => ({ ...prev, requirements: entries }));
+        setRequirementDraft(session.summary);
+        setSaveStatus('success');
+        setSaveFeedback('保存済みの要件を読み込みました');
+        setRequirementsUpdatedAt(session.updatedAt ?? new Date().toISOString());
+        setPlanStatus('idle');
+        setPlanFeedback('');
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        resetFlag = true;
+        setSaveStatus('error');
+        setSaveFeedback('要件の読み込みに失敗しました');
+      } finally {
+        if (requirementsFetchAbortRef.current === controller) {
+          requirementsFetchAbortRef.current = null;
+        }
+        if (resetFlag) {
+          requirementsFetchedRef.current = false;
+        }
+      }
+    })();
+
+    return () => {
+      controller.abort();
+      if (requirementsFetchAbortRef.current === controller) {
+        requirementsFetchAbortRef.current = null;
+      }
+    };
+  }, [open, mode, requirementsHistory.length]);
+
+  useEffect(() => {
+    if (saveStatus === 'success') return;
+    setPlanStatus('idle');
+    setPlanFeedback('');
+  }, [saveStatus]);
 
   // 日本語メモ: 設定（AI名/口調、ストリーム既定、遅延ms）を読込み、チャットの初期値に反映
   useEffect(() => {
@@ -242,23 +352,25 @@ export default function ChatPanel({
 
   function formatConversation(conversation: HistoryEntry[]): string {
     const aiTurns = conversation.filter((entry) => entry.role === 'ai').length;
-    const stageInstructions: string[] = [
-      'ステージ1: プロジェクトの背景や利用シーンを引き出す質問を1つだけ投げ、返答は最大2文に収めてください。',
-      'ステージ2: 主要な機能やユーザーストーリーを確認する質問を1つだけ投げ、返答は最大2文に収めてください。',
-      'ステージ3: これまでの内容を3行以内の箇条書きでまとめ、成功指標か次のアクションを1つ提案し、最後に「要件サマリーを保存しましょう」と促してください。',
+    const focusGuidance: string[] = [
+      '最初は Stage 1（背景・目的）に集中し、なぜ作るのか・誰のためなのかを丁寧に整理してください。',
+      '次は Stage 2（主要機能・ユーザー体験）で、利用シナリオや価値を具体的に掘り下げてください。',
+      '以降は Stage 3（技術要件・制約・成功指標）や不足しているステージを補完し、必要に応じて深掘り可否を確認してください。',
     ];
-    const currentStage = Math.min(aiTurns, stageInstructions.length - 1);
-    const stageHeader = stageInstructions[currentStage];
+    const stageFocus = focusGuidance[Math.min(aiTurns, focusGuidance.length - 1)];
 
     const header = [
       'あなたは開発初心者を支援するプロダクト要件コーチです。',
-      '会話は日本語で行い、専門用語は可能な限り噛み砕いて説明してください。',
-      '会話は最大3ターンの応答で完結させてください。',
-      'ステージ1とステージ2では過去の内容を要約しないでください。具体例は最大1個に留め、初心者でも理解できる表現にします。',
-      'ステージ3のみ要約を行い、追加質問はせずに締めてください。',
-      'これまでの会話ログを参考に、抜けている観点があれば該当ステージで質問してください。',
-      stageHeader,
-      'ステージは合計3つです。ステージ3が完了したら、ユーザーに要件サマリーの確認と保存を促してください。',
+      '会話は日本語で行い、専門用語は噛み砕いて説明してください。',
+      'ユーザーの回答を Stage 1〜3 に分類し、毎回以下の形式で要約を更新します：',
+      'Stage 1 — 背景/目的: <箇条書き2件以内。情報が無い場合は(未入力)>',
+      'Stage 2 — 機能/体験: <同上>',
+      'Stage 3 — 技術/制約: <同上>',
+      '会話ログ全体を毎回見直し、情報が複数のステージに跨る場合でも適切なステージへ再整理してください。',
+      '各 Stage の要約を提示した後、不足しているステージや関連トピックを1つ提案し、さらに掘り下げるか、それともここで要件定義を終えるかを丁寧に確認してください。',
+      'ユーザーが「終わり」「大丈夫です」「ここで終了」など明確に終了を示すまで、要約と質問のサイクルを続けてください。',
+      '終了を提案するときは「このまま要件定義を終えますか？」など柔らかい言い回しを添えてください。',
+      stageFocus,
       '--- 会話ログ ---',
     ];
     const lines = conversation.map((entry) => {
@@ -416,13 +528,73 @@ export default function ChatPanel({
         const text = await res.text().catch(() => '');
         throw new Error(text || `Failed to save requirements (${res.status})`);
       }
-      await res.json().catch(() => ({}));
+      const payload = await res.json().catch(() => ({} as { requirements?: RequirementsSession }));
+      const session = payload && typeof payload === 'object'
+        ? ((payload as { requirements?: RequirementsSession }).requirements ?? null)
+        : null;
+      const nowIso = new Date().toISOString();
+      if (session) {
+        const entries = normalizeRequirementHistory(session.conversation);
+        setHistories((prev) => ({ ...prev, requirements: entries }));
+        if (typeof session.summary === 'string') {
+          setRequirementDraft(session.summary);
+        }
+        setRequirementsUpdatedAt(session.updatedAt ?? nowIso);
+      } else {
+        setRequirementsUpdatedAt(nowIso);
+      }
+      requirementsFetchedRef.current = true;
+      setPlanStatus('idle');
+      setPlanFeedback('');
       setSaveStatus('success');
       setSaveFeedback('要件を保存しました');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '保存に失敗しました';
       setSaveStatus('error');
       setSaveFeedback(message);
+    }
+  }
+
+  async function handleGeneratePlan() {
+    if (!onGeneratePlan || isPlanBusy) return;
+    setPlanStatus('loading');
+    setPlanFeedback('');
+    try {
+      const result = await onGeneratePlan();
+      if (!result) {
+        setPlanStatus('success');
+        setPlanFeedback('プランを生成しました');
+        return;
+      }
+      if (result.success) {
+        if (result.skipped) {
+          setPlanStatus('skipped');
+          const message = result.skipped === 'missing_api_key'
+            ? 'APIキー未設定のためプラン生成をスキップしました'
+            : `プラン生成をスキップしました（${result.skipped}）`;
+          setPlanFeedback(message);
+        } else {
+          const { added, updated, unchanged, totalSeeds } = result.summary;
+          let summaryText = '';
+          if (totalSeeds === 0) {
+            summaryText = 'AIタスク提案はありませんでした';
+          } else {
+            const parts: string[] = [];
+            if (added > 0) parts.push(`追加${added}件`);
+            if (updated > 0) parts.push(`更新${updated}件`);
+            if (unchanged > 0) parts.push(`既存維持${unchanged}件`);
+            summaryText = parts.length > 0 ? parts.join('・') : '既存タスクは変更ありません';
+          }
+          setPlanStatus('success');
+          setPlanFeedback(`プランを生成しました（${summaryText}）`);
+        }
+      } else {
+        setPlanStatus('error');
+        setPlanFeedback(result.error || 'プラン生成に失敗しました');
+      }
+    } catch (err) {
+      setPlanStatus('error');
+      setPlanFeedback(err instanceof Error ? err.message : 'プラン生成に失敗しました');
     }
   }
 
@@ -457,6 +629,9 @@ export default function ChatPanel({
                       setRequirementDraft('');
                       setSaveStatus('idle');
                       setSaveFeedback('');
+                      setRequirementsUpdatedAt(null);
+                      setPlanStatus('idle');
+                      setPlanFeedback('');
                     }
                   }}
                   className="px-3 py-1 text-sm border border-neon border-opacity-40 rounded-md hover:bg-neon hover:bg-opacity-10"
@@ -541,7 +716,7 @@ export default function ChatPanel({
               }}
               placeholder="ここに確定した要件テキストをまとめてください"
             />
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={finalizeRequirements}
@@ -550,9 +725,30 @@ export default function ChatPanel({
               >
                 {isSavingRequirements ? '保存中…' : '要件を保存'}
               </button>
+              {onGeneratePlan && (
+                <button
+                  type="button"
+                  onClick={handleGeneratePlan}
+                  className="px-3 py-1.5 text-sm border border-neon border-opacity-40 rounded-md text-neon hover:bg-neon hover:bg-opacity-10 disabled:opacity-60"
+                  disabled={saveStatus !== 'success' || isSavingRequirements || streaming || isPlanBusy}
+                  title={planButtonTitle}
+                >
+                  {planButtonLabel}
+                </button>
+              )}
+            </div>
+            <div className="flex flex-col gap-1 text-xs">
+              {formattedRequirementsUpdatedAt && (
+                <span className="text-white/40">最終保存: {formattedRequirementsUpdatedAt}</span>
+              )}
               {saveFeedback && (
-                <span className={`text-xs ${saveStatus === 'success' ? 'text-emerald-300' : saveStatus === 'error' ? 'text-red-300' : 'text-white/60'}`}>
+                <span className={saveMessageColor}>
                   {saveFeedback}
+                </span>
+              )}
+              {planFeedback && (
+                <span className={planMessageColor}>
+                  {planFeedback}
                 </span>
               )}
             </div>

@@ -28,6 +28,13 @@ export type RequirementsSession = {
   updatedAt: string; // ISO8601
 };
 
+export type TaskMergeSummary = {
+  added: number;
+  updated: number;
+  unchanged: number;
+  totalSeeds: number;
+};
+
 export type RepoData = {
   tasks: WebTask[];
   timer?: { startedAt: number; durationSeconds: number };
@@ -166,23 +173,102 @@ function sanitizeGeneratedSeeds(seeds: GeneratedTaskSeed[]): Array<{ title: stri
     .filter((item): item is { title: string; mapNode?: MapNodeKey } => Boolean(item));
 }
 
-export async function replaceTasksWithGenerated(seeds: GeneratedTaskSeed[]) {
+export async function replaceTasksWithGenerated(
+  seeds: GeneratedTaskSeed[],
+): Promise<{ tasks: WebTask[]; summary: TaskMergeSummary }> {
   const sanitized = sanitizeGeneratedSeeds(seeds);
   if (sanitized.length === 0) {
     throw new Error('No valid tasks to save');
   }
+
+  // 日本語メモ: AI提案はタイトル単位で重複を排除し、キー一致した既存タスクへ差分マージする。
+  const deduped: Array<{ key: string; title: string; mapNode?: MapNodeKey }> = [];
+  const seen = new Set<string>();
+  for (const item of sanitized) {
+    const key = item.title.trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    deduped.push({ key, title: item.title, mapNode: item.mapNode });
+  }
+
+  if (deduped.length === 0) {
+    throw new Error('No valid tasks to save');
+  }
+
   const data = await loadData();
-  const tasks: WebTask[] = sanitized.map((seed, index) => ({
-    id: index + 1,
-    title: seed.title,
-    completed: false,
-    inProgress: false,
-    deps: [],
-    mapNode: seed.mapNode ?? MAP_NODE_KEYS[0],
-  }));
-  data.tasks = tasks;
+  const existing = Array.isArray(data.tasks) ? data.tasks : [];
+
+  const seedsByKey = new Map<string, { title: string; mapNode?: MapNodeKey }>();
+  for (const item of deduped) {
+    seedsByKey.set(item.key, { title: item.title, mapNode: item.mapNode });
+  }
+
+  let updatedCount = 0;
+  let matchedCount = 0;
+  const updatedTasks = existing.map((task) => {
+    const key = task.title.trim().toLowerCase();
+    const seed = seedsByKey.get(key);
+    if (!seed) return task;
+    seedsByKey.delete(key);
+    matchedCount += 1;
+
+    let changed = false;
+    const next: WebTask = { ...task };
+
+    if (seed.title !== task.title) {
+      next.title = seed.title;
+      changed = true;
+    }
+
+    if (seed.mapNode && seed.mapNode !== task.mapNode) {
+      next.mapNode = seed.mapNode;
+      changed = true;
+    }
+
+    if (changed) {
+      updatedCount += 1;
+    }
+
+    return next;
+  });
+
+  let addedCount = 0;
+  let nextId = existing.reduce((max, task) => Math.max(max, task.id), 0) + 1;
+
+  for (const item of deduped) {
+    if (!seedsByKey.has(item.key)) continue;
+    seedsByKey.delete(item.key);
+    const newTask: WebTask = {
+      id: nextId,
+      title: item.title,
+      completed: false,
+      inProgress: false,
+      deps: [],
+    };
+    if (item.mapNode) {
+      newTask.mapNode = item.mapNode;
+    } else if (MAP_NODE_KEYS.length > 0) {
+      newTask.mapNode = MAP_NODE_KEYS[0];
+    }
+    updatedTasks.push(newTask);
+    addedCount += 1;
+    nextId += 1;
+  }
+
+  data.tasks = updatedTasks;
   await saveData(data);
-  return tasks;
+
+  const unchanged = Math.max(0, matchedCount - updatedCount);
+
+  return {
+    tasks: updatedTasks,
+    summary: {
+      added: addedCount,
+      updated: updatedCount,
+      unchanged,
+      totalSeeds: deduped.length,
+    },
+  };
 }
 
 export async function getRequirements(): Promise<RequirementsSession | null> {
